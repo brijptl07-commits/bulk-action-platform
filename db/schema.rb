@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
+ActiveRecord::Schema[7.0].define(version: 2026_10_05_192114) do
   create_table "bulk_action_logs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bulk_action_id", null: false
     t.bigint "entity_id", null: false
@@ -41,7 +41,9 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.text "error_message"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "sequence"
     t.index ["account_id", "created_at"], name: "index_bulk_actions_on_account_id_and_created_at"
+    t.index ["sequence"], name: "index_bulk_actions_on_sequence"
     t.index ["status"], name: "index_bulk_actions_on_status"
   end
 
@@ -53,6 +55,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.string "status", default: "prospect", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "last_bulk_action_id"
+    t.bigint "last_bulk_action_seq"
     t.index ["domain"], name: "index_companies_on_domain"
     t.index ["industry"], name: "index_companies_on_industry"
     t.index ["status"], name: "index_companies_on_status"
@@ -65,6 +69,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.string "status", default: "lead", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "last_bulk_action_id"
+    t.bigint "last_bulk_action_seq"
     t.index ["email"], name: "index_contacts_on_email"
     t.index ["status"], name: "index_contacts_on_status"
   end
@@ -78,6 +84,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.string "status", default: "new", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "last_bulk_action_id"
+    t.bigint "last_bulk_action_seq"
     t.index ["email"], name: "index_leads_on_email"
     t.index ["source"], name: "index_leads_on_source"
     t.index ["status"], name: "index_leads_on_status"
@@ -92,8 +100,16 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.date "close_date"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "last_bulk_action_id"
+    t.bigint "last_bulk_action_seq"
     t.index ["company_id"], name: "index_opportunities_on_company_id"
     t.index ["stage"], name: "index_opportunities_on_stage"
+  end
+
+  create_table "sequences", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.bigint "value", default: 0, null: false
+    t.index ["name"], name: "index_sequences_on_name", unique: true
   end
 
   create_table "tasks", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -105,6 +121,8 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
     t.string "assignee"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "last_bulk_action_id"
+    t.bigint "last_bulk_action_seq"
     t.index ["assignee"], name: "index_tasks_on_assignee"
     t.index ["priority"], name: "index_tasks_on_priority"
     t.index ["status"], name: "index_tasks_on_status"

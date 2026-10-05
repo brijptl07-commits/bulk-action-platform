@@ -76,6 +76,7 @@ class BulkAction < ApplicationRecord
       entity_type: entity_type,
       action_type: action_type,
       status: status,
+      sequence: sequence,
       payload: payload,
       filters: filters,
       dedupe: dedupe,

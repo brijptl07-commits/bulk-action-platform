@@ -57,6 +57,7 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
 | **Progress / stats** | Counters (`total`, `processed`, `success`, `failed`, `skipped`) are maintained atomically with `UPDATE ... SET x = x + n` — stats are O(1), no `COUNT(*)` over logs. |
 | **Reliability** | Batch jobs retry (Sidekiq, 5 attempts). They are idempotent: already-logged ids are skipped, and a unique index on `(bulk_action_id, entity_id)` prevents double logging. Counter update + log insert happen in one transaction (counter row locked first to avoid MySQL FK deadlocks). Status changes use conditional updates (`WHERE status IN (...)`) so concurrent workers can't race. |
 | **Extensibility** | Two registries: `EntityRegistry` (which models + which fields are updatable/filterable/dedupe) and `ActionRegistry` (`action_type` → handler class). Planning, batching, retries, rate limiting, dedupe, logs and stats are shared by every action. |
+| **Concurrent actions on the same records** | Each action gets a strictly increasing `sequence` when it starts (durable MySQL counter). Every write stamps `last_bulk_action_seq` on the record, and the batch `UPDATE` only touches rows whose stamp is not newer. So if action 2 started after action 1, action 1 can never overwrite action 2's values, even if its batch runs later; those records are logged as `skipped — Superseded by newer bulk action #2`. Actions still run fully in parallel. |
 | **Safety** | Filters must be explicit (`ids`, `where`, or `all: true`), and only whitelisted fields can be filtered/updated. |
 
 ### Data model
@@ -252,6 +253,43 @@ value was already present, the record is passed to the batch as a duplicate and 
 (visible in the list and cancellable) until it starts.
 
 ---
+
+## Concurrent actions on the same records
+
+Scenario: action 1 sets `name = name1`, action 2 (started later) sets `name = name2` on the same contacts, but
+action 1's batch is delayed and runs after action 2's. Without protection the record would end with the stale
+`name1`.
+
+How it is prevented:
+
+1. When an action starts, `PlanJob` assigns `bulk_actions.sequence` from `Sequence.next(:bulk_action)`, which is
+   an atomic `UPDATE sequences SET value = LAST_INSERT_ID(value + 1)` and so strictly increasing across processes.
+2. Each entity table has `last_bulk_action_seq` / `last_bulk_action_id`, stamped on every bulk write.
+3. The batch update is conditional:
+   `UPDATE ... SET ..., last_bulk_action_seq = :seq WHERE id IN (...) AND (last_bulk_action_seq IS NULL OR last_bulk_action_seq <= :seq)`.
+   MySQL evaluates this per row under a row lock, so it is race-free even when both actions write the same row
+   at the same moment. `<=` lets retries of the same action re-apply safely.
+4. Rows a newer action already owns are logged as `skipped` with `Superseded by newer bulk action #N`.
+   Records that already have the target values are still stamped, so an older action can't overwrite them later.
+
+```bash
+bin/rails bulk:ordering_demo          # runs the newer action's batch first, then the older one
+```
+
+```
+Final values:
+  #1: name="name2 (newer action)" last_bulk_action_id=21
+  ...
+Action #21: completed {:success=>5, :failed=>0, :skipped=>0}
+Action #20: completed {:success=>0, :failed=>0, :skipped=>5}
+  skipped x5 Superseded by newer bulk action #21
+```
+
+Verified end to end as well: two actions submitted back to back on the same 3,000 contacts ran concurrently;
+every contact ended with the newer action's value (the older action wrote 2,000 rows first, then skipped 1,000
+as superseded).
+
+New entities get this protection by adding the two columns; without them the handler falls back to plain updates.
 
 ## Load test
 

@@ -27,6 +27,7 @@
   <dl class="details">
     <dt>Account</dt><dd class="mono"><%= @bulk_action.account_id %></dd>
     <dt>Action</dt><dd><%= @bulk_action.action_type %> on <%= @bulk_action.entity_type %></dd>
+    <dt>Sequence</dt><dd><%= @bulk_action.sequence || "— (assigned when started)" %> <span class="muted">later-started actions win on shared records</span></dd>
     <dt>Payload</dt><dd class="mono"><%= @bulk_action.payload.to_json %></dd>
     <dt>Filters</dt><dd class="mono"><%= @bulk_action.filters.to_json.truncate(300) %></dd>
     <dt>De-duplicate</dt><dd><%= @bulk_action.dedupe ? "Yes (by #{@bulk_action.entity_config.dedupe_field})" : "No" %></dd>

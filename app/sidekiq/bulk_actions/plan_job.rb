@@ -9,7 +9,9 @@ module BulkActions
     def perform(bulk_action_id)
       bulk_action = BulkAction.find_by(id: bulk_action_id)
       return unless bulk_action
-      return unless bulk_action.transition!(from: %w[queued scheduled], to: "in_progress", started_at: Time.current)
+      # The sequence orders actions by start time: on any record, a later-started action always wins.
+      return unless bulk_action.transition!(from: %w[queued scheduled], to: "in_progress", started_at: Time.current,
+                                            sequence: Sequence.next(:bulk_action))
 
       entity = bulk_action.entity_config
       scope = ScopeBuilder.new(entity, bulk_action.filters).relation
