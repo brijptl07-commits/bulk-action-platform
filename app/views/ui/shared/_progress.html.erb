@@ -1,0 +1,2 @@
+<div class="progress"><div class="progress-bar" style="width: <%= bulk_action.progress_percent %>%"></div></div>
+<div class="progress-label"><%= number_with_delimiter(bulk_action.processed_count) %> / <%= number_with_delimiter(bulk_action.total_count) %> (<%= bulk_action.progress_percent %>%)</div>

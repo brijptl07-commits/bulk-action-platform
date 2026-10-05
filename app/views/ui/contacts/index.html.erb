@@ -1,0 +1,32 @@
+<div class="page-head">
+  <h1>Contacts <span class="muted" style="font-size:14px; font-weight:normal"><%= number_with_delimiter(@counts.values.sum) %> total</span></h1>
+  <%= form_with url: ui_contacts_path, method: :get, class: "inline" do %>
+    <%= hidden_field_tag :status, @status %>
+    <%= text_field_tag :q, params[:q], placeholder: "Search email", style: "width:220px" %>
+    <%= submit_tag "Search", class: "btn", name: nil %>
+  <% end %>
+</div>
+
+<div class="tabs">
+  <%= link_to "All", ui_contacts_path, class: ("active" if @status.nil?) %>
+  <% Contact::STATUSES.each do |s| %>
+    <%= link_to "#{s.humanize} (#{@counts[s].to_i})", ui_contacts_path(status: s), class: ("active" if @status == s) %>
+  <% end %>
+</div>
+
+<table>
+  <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Status</th><th>Updated</th></tr></thead>
+  <tbody>
+    <% @contacts.each do |c| %>
+      <tr>
+        <td class="mono"><%= c.id %></td>
+        <td><%= c.name %></td>
+        <td><%= c.email %></td>
+        <td><%= c.age %></td>
+        <td><span class="badge"><%= c.status %></span></td>
+        <td class="muted"><%= time_ago_in_words(c.updated_at) %> ago</td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+<%= paginate @contacts %>

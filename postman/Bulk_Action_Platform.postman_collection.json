@@ -1,0 +1,198 @@
+{
+  "info": {
+    "name": "Bulk Action Platform",
+    "description": "API for creating and tracking bulk actions on CRM entities. Set the `baseUrl` variable (default http://localhost:3000). Creating a bulk action stores its id in `bulkActionId` for the follow-up requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "bulkActionId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Bulk Actions",
+      "item": [
+        {
+          "name": "Create - update status by filter (with de-dupe)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"lead\" } },\n  \"payload\": { \"fields\": { \"status\": \"prospect\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create - update multiple fields by ids",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [1, 2, 3, 4, 5] },\n  \"payload\": { \"fields\": { \"name\": \"Updated Name\", \"age\": 35, \"status\": \"customer\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create - all contacts",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_2\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"age\": 30 } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create - scheduled for later",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"scheduled_at\": \"2026-11-22T23:15:00+05:30\",\n  \"filters\": { \"where\": { \"status\": \"churned\" } },\n  \"payload\": { \"fields\": { \"status\": \"lead\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create - validation errors (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"password\": \"secret\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create - per-record failures (age out of range)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [10, 11, 12] },\n  \"payload\": { \"fields\": { \"age\": 500 } }\n}"
+            }
+          }
+        },
+        {
+          "name": "List bulk actions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions?page=1&per_page=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["bulk-actions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "25" },
+                { "key": "status", "value": "in_progress,queued,scheduled", "disabled": true, "description": "Comma separated: scheduled, queued, in_progress, completed, failed, cancelled" },
+                { "key": "account_id", "value": "acc_1", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get bulk action",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}"] }
+          }
+        },
+        {
+          "name": "Get bulk action stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/stats", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}", "stats"] }
+          }
+        },
+        {
+          "name": "Get bulk action logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/logs?page=1&per_page=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["bulk-actions", "{{bulkActionId}}", "logs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "50" },
+                { "key": "status", "value": "skipped", "disabled": true, "description": "success, failed, skipped (comma separated)" },
+                { "key": "entity_id", "value": "1", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel bulk action",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/cancel", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}", "cancel"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Helpers",
+      "item": [
+        {
+          "name": "List entities & actions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/entities", "host": ["{{baseUrl}}"], "path": ["entities"] }
+          }
+        },
+        {
+          "name": "List contacts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/contacts?page=1&per_page=25",
+              "host": ["{{baseUrl}}"],
+              "path": ["contacts"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "25" },
+                { "key": "status", "value": "lead", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

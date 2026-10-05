@@ -1,0 +1,10 @@
+<% if local_assigns[:enabled] %>
+  <script>
+    (function () {
+      var href = window.location.href;
+      setTimeout(function () {
+        if (window.location.href === href) Turbo.visit(href, { action: "replace" });
+      }, 2000);
+    })();
+  </script>
+<% end %>

@@ -1,0 +1,77 @@
+<h1>New Bulk Action</h1>
+
+<% if @errors.present? %>
+  <div class="flash flash-alert">
+    <% @errors.each do |e| %><div><%= e %></div><% end %>
+  </div>
+<% end %>
+
+<%= form_with scope: :form, url: ui_bulk_actions_path, method: :post do |f| %>
+  <div class="form-grid">
+    <div class="card">
+      <h2 style="margin-top:0">1. What</h2>
+      <div class="field">
+        <%= f.label :account_id, "Account ID" %>
+        <%= f.text_field :account_id, value: @form["account_id"] %>
+        <div class="hint">Rate limit is applied per account (<%= number_with_delimiter(BulkActions::Config.rate_limit_per_minute) %> records/min).</div>
+      </div>
+      <div class="field">
+        <%= f.label :entity_type, "Entity" %>
+        <%= f.select :entity_type, BulkActions::EntityRegistry.names.map { |n| [n.humanize, n] }, selected: @form["entity_type"] %>
+      </div>
+      <div class="field">
+        <%= f.label :action_type, "Action" %>
+        <%= f.select :action_type, BulkActions::ActionRegistry.names.map { |n| [n.humanize, n] }, selected: @form["action_type"] %>
+      </div>
+
+      <h2>2. Fields to update</h2>
+      <% fields = @form["fields"] || {}; enabled = @form["update"] || {} %>
+      <div class="update-row">
+        <label class="inline"><%= check_box_tag "form[update][name]", "1", enabled["name"] == "1" %> Name</label>
+        <%= text_field_tag "form[fields][name]", fields["name"] %>
+      </div>
+      <div class="update-row">
+        <label class="inline"><%= check_box_tag "form[update][email]", "1", enabled["email"] == "1" %> Email</label>
+        <%= text_field_tag "form[fields][email]", fields["email"] %>
+      </div>
+      <div class="update-row">
+        <label class="inline"><%= check_box_tag "form[update][age]", "1", enabled["age"] == "1" %> Age</label>
+        <%= text_field_tag "form[fields][age]", fields["age"] %>
+      </div>
+      <div class="update-row">
+        <label class="inline"><%= check_box_tag "form[update][status]", "1", enabled["status"] == "1" %> Status</label>
+        <%= select_tag "form[fields][status]", options_for_select(Contact::STATUSES, fields["status"]) %>
+      </div>
+      <div class="hint">Tick the fields you want to change.</div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">3. Which records</h2>
+      <div class="field">
+        <label class="inline"><%= radio_button_tag "form[target]", "where", @form["target"] == "where" %> Contacts with status</label>
+        <%= select_tag "form[where_status]", options_for_select(Contact::STATUSES, @form["where_status"]) %>
+      </div>
+      <div class="field">
+        <label class="inline"><%= radio_button_tag "form[target]", "ids", @form["target"] == "ids" %> Specific IDs</label>
+        <%= text_area_tag "form[ids]", @form["ids"], rows: 3, placeholder: "1, 2, 3, 42" %>
+      </div>
+      <div class="field">
+        <label class="inline"><%= radio_button_tag "form[target]", "all", @form["target"] == "all" %> All contacts (<%= number_with_delimiter(Contact.count) %>)</label>
+      </div>
+
+      <h2>4. Options</h2>
+      <div class="field">
+        <label class="inline"><%= check_box_tag "form[dedupe]", "1", @form["dedupe"] == "1" %> Skip duplicates by email</label>
+        <div class="hint">Only the first record per email is processed; others are logged as skipped.</div>
+      </div>
+      <div class="field">
+        <%= label_tag "form[scheduled_at]", "Schedule for later (optional)" %>
+        <%= datetime_local_field_tag "form[scheduled_at]", @form["scheduled_at"] %>
+        <div class="hint">Leave empty to run immediately. Time zone: <%= Time.zone.name %>.</div>
+      </div>
+    </div>
+  </div>
+
+  <%= f.submit "Create Bulk Action", class: "btn btn-primary" %>
+  <%= link_to "Cancel", ui_bulk_actions_path, class: "btn" %>
+<% end %>

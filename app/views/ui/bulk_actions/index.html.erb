@@ -1,0 +1,44 @@
+<div class="page-head">
+  <h1>Bulk Actions</h1>
+  <%= link_to "+ New Bulk Action", new_ui_bulk_action_path, class: "btn btn-primary" %>
+</div>
+
+<div class="tabs">
+  <%= link_to "All", ui_bulk_actions_path, class: ("active" if @status.nil?) %>
+  <% [["active", "Active"], ["scheduled", "Scheduled"], ["queued", "Queued"], ["in_progress", "In progress"], ["completed", "Completed"], ["failed", "Failed"], ["cancelled", "Cancelled"]].each do |value, label| %>
+    <%= link_to label, ui_bulk_actions_path(status: value), class: ("active" if @status == value) %>
+  <% end %>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Account</th><th>Action</th><th>Status</th><th style="width: 220px">Progress</th>
+      <th>Success</th><th>Failed</th><th>Skipped</th><th>Created</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @bulk_actions.each do |a| %>
+      <tr>
+        <td><%= link_to "##{a.id}", ui_bulk_action_path(a) %></td>
+        <td class="mono"><%= a.account_id %></td>
+        <td><%= a.action_type %> <span class="muted">on <%= a.entity_type %></span></td>
+        <td>
+          <span class="badge badge-<%= a.status %>"><%= a.status.humanize %></span>
+          <% if a.scheduled? %><div class="progress-label">at <%= l(a.scheduled_at.in_time_zone, format: :short) %></div><% end %>
+        </td>
+        <td><%= render "ui/shared/progress", bulk_action: a %></td>
+        <td><%= number_with_delimiter(a.success_count) %></td>
+        <td><%= number_with_delimiter(a.failure_count) %></td>
+        <td><%= number_with_delimiter(a.skipped_count) %></td>
+        <td class="muted"><%= time_ago_in_words(a.created_at) %> ago</td>
+      </tr>
+    <% end %>
+    <% if @bulk_actions.empty? %>
+      <tr><td colspan="9" class="muted">No bulk actions yet.</td></tr>
+    <% end %>
+  </tbody>
+</table>
+<%= paginate @bulk_actions %>
+
+<%= render "ui/shared/auto_refresh", enabled: @auto_refresh %>

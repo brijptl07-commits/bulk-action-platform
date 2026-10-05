@@ -1,0 +1,79 @@
+<div class="page-head">
+  <h1>
+    Bulk Action #<%= @bulk_action.id %>
+    <span class="badge badge-<%= @bulk_action.status %>"><%= @bulk_action.status.humanize %></span>
+  </h1>
+  <div>
+    <% unless @bulk_action.finished? %>
+      <%= button_to "Cancel", cancel_ui_bulk_action_path(@bulk_action), class: "btn btn-danger", form: { style: "display:inline" }, data: { turbo_confirm: "Cancel this bulk action?" } %>
+    <% end %>
+    <%= link_to "Stats JSON", stats_bulk_action_path(@bulk_action), class: "btn", target: "_blank" %>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="value"><%= number_with_delimiter(@bulk_action.total_count) %></div><div class="label">Total</div></div>
+  <div class="stat"><div class="value"><%= number_with_delimiter(@bulk_action.processed_count) %></div><div class="label">Processed</div></div>
+  <div class="stat success"><div class="value"><%= number_with_delimiter(@bulk_action.success_count) %></div><div class="label">Success</div></div>
+  <div class="stat failed"><div class="value"><%= number_with_delimiter(@bulk_action.failure_count) %></div><div class="label">Failed</div></div>
+  <div class="stat skipped"><div class="value"><%= number_with_delimiter(@bulk_action.skipped_count) %></div><div class="label">Skipped</div></div>
+</div>
+
+<div class="card">
+  <%= render "ui/shared/progress", bulk_action: @bulk_action %>
+</div>
+
+<div class="card">
+  <dl class="details">
+    <dt>Account</dt><dd class="mono"><%= @bulk_action.account_id %></dd>
+    <dt>Action</dt><dd><%= @bulk_action.action_type %> on <%= @bulk_action.entity_type %></dd>
+    <dt>Payload</dt><dd class="mono"><%= @bulk_action.payload.to_json %></dd>
+    <dt>Filters</dt><dd class="mono"><%= @bulk_action.filters.to_json.truncate(300) %></dd>
+    <dt>De-duplicate</dt><dd><%= @bulk_action.dedupe ? "Yes (by #{@bulk_action.entity_config.dedupe_field})" : "No" %></dd>
+    <dt>Scheduled at</dt><dd><%= @bulk_action.scheduled_at&.in_time_zone || "—" %></dd>
+    <dt>Started at</dt><dd><%= @bulk_action.started_at&.in_time_zone || "—" %></dd>
+    <dt>Completed at</dt><dd><%= @bulk_action.completed_at&.in_time_zone || "—" %></dd>
+    <% if @bulk_action.started_at && @bulk_action.completed_at %>
+      <dt>Duration</dt><dd><%= (@bulk_action.completed_at - @bulk_action.started_at).round(2) %>s</dd>
+    <% end %>
+    <% if @bulk_action.error_message.present? %>
+      <dt>Error</dt><dd class="mono" style="color:#b91c1c"><%= @bulk_action.error_message %></dd>
+    <% end %>
+  </dl>
+</div>
+
+<h2>Logs</h2>
+<div class="page-head">
+  <div class="tabs" style="margin:0">
+    <%= link_to "All", ui_bulk_action_path(@bulk_action), class: ("active" if @log_status.nil?) %>
+    <% %w[success failed skipped].each do |s| %>
+      <%= link_to s.humanize, ui_bulk_action_path(@bulk_action, log_status: s), class: ("active" if @log_status == s) %>
+    <% end %>
+  </div>
+  <%= form_with url: ui_bulk_action_path(@bulk_action), method: :get, class: "inline" do %>
+    <%= hidden_field_tag :log_status, @log_status %>
+    <%= text_field_tag :entity_id, params[:entity_id], placeholder: "Entity ID", style: "width:140px" %>
+    <%= submit_tag "Filter", class: "btn", name: nil %>
+  <% end %>
+</div>
+
+<table>
+  <thead><tr><th>Log #</th><th>Entity ID</th><th>Status</th><th>Message</th><th>Time</th></tr></thead>
+  <tbody>
+    <% @logs.each do |log| %>
+      <tr>
+        <td class="muted"><%= log.id %></td>
+        <td class="mono"><%= log.entity_id %></td>
+        <td><span class="badge badge-<%= log.status %>"><%= log.status %></span></td>
+        <td><%= log.message %></td>
+        <td class="muted"><%= log.created_at.in_time_zone.strftime("%H:%M:%S") %></td>
+      </tr>
+    <% end %>
+    <% if @logs.empty? %>
+      <tr><td colspan="5" class="muted">No logs yet.</td></tr>
+    <% end %>
+  </tbody>
+</table>
+<%= paginate @logs %>
+
+<%= render "ui/shared/auto_refresh", enabled: @auto_refresh %>
