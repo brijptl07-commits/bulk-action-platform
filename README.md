@@ -58,7 +58,29 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
 | **Reliability** | Batch jobs retry (Sidekiq, 5 attempts). They are idempotent: already-logged ids are skipped, and a unique index on `(bulk_action_id, entity_id)` prevents double logging. Counter update + log insert happen in one transaction (counter row locked first to avoid MySQL FK deadlocks). Status changes use conditional updates (`WHERE status IN (...)`) so concurrent workers can't race. |
 | **Extensibility** | Two registries: `EntityRegistry` (which models + which fields are updatable/filterable/dedupe) and `ActionRegistry` (`action_type` → handler class). Planning, batching, retries, rate limiting, dedupe, logs and stats are shared by every action. |
 | **Concurrent actions on the same records** | Each action gets a strictly increasing `sequence` when it starts (durable MySQL counter). Every write stamps `last_bulk_action_seq` on the record, and the batch `UPDATE` only touches rows whose stamp is not newer. So if action 2 started after action 1, action 1 can never overwrite action 2's values, even if its batch runs later; those records are logged as `skipped — Superseded by newer bulk action #2`. Actions still run fully in parallel. |
+| **Concurrent actions on the same records** | Last-writer-wins **per field**, independent of execution order (see below). |
 | **Safety** | Filters must be explicit (`ids`, `where`, or `all: true`), and only whitelisted fields can be filtered/updated. |
+
+### Overlapping bulk actions (ordering guarantee)
+
+Two bulk actions can target the same records, e.g. action #1 sets `name = "name1"` and action #2 (submitted later)
+sets `name = "name2"`. Batches of #1 can run *after* #2 because of a rate-limit delay, a retry or a slow worker.
+Without protection #1 would overwrite the newer value.
+
+`FieldVersionGuard` prevents this:
+
+1. In one transaction the batch's rows are locked (`SELECT ... FOR UPDATE`, ordered by id).
+2. `bulk_field_versions` stores, per `(entity_type, entity_id, field)`, which action last wrote it.
+3. A field is written only if no **newer** action owns it. Newer = later `scheduled_at || created_at` (tie → higher id).
+4. The action is then recorded as the latest writer of the fields it applied (also for no-op writes).
+
+It is **per field**: if #1 changes `name` + `score` and #2 changes only `name`, a late #1 still applies `score`.
+Superseded records/fields are visible in the logs, e.g. `Superseded by newer bulk action #27` or
+`name superseded by #27`.
+
+Verified: action #1 was held back by the rate limiter while #2 completed; when #1 ran a minute later all 300 leads
+kept `name2` and received #1's `score`. Re-running an older action's batch after a newer one completed (simulated
+Sidekiq retry) left every record unchanged and logged `skipped / Superseded by newer bulk action`.
 
 ### Data model
 

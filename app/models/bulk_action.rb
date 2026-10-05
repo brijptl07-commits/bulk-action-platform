@@ -32,6 +32,15 @@ class BulkAction < ApplicationRecord
     ((processed_count.to_f / total_count) * 100).round(2)
   end
 
+  # Ordering between bulk actions: the one submitted to run later wins. Ties broken by id.
+  def effective_at
+    scheduled_at || created_at
+  end
+
+  def version_key
+    [effective_at, id]
+  end
+
   def entity_config
     BulkActions::EntityRegistry.fetch(entity_type)
   end

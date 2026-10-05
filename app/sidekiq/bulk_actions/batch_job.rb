@@ -29,7 +29,7 @@ module BulkActions
       records = entity.model.where(id: ids).to_a
       results = records.any? ? bulk_action.handler_class.new(bulk_action, entity).call(records) : []
 
-      missing_ids = ids - records.map(&:id)
+      missing_ids = ids - results.map(&:entity_id)
       results += missing_ids.map { |id| Handlers::Base::Result.new(id, "skipped", "Record not found") }
       results += duplicate_ids.map do |id|
         Handlers::Base::Result.new(id, "skipped", "Duplicate #{entity.dedupe_field}")
