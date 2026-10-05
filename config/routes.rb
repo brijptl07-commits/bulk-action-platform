@@ -10,8 +10,8 @@ Rails.application.routes.draw do
         post :cancel
       end
     end
-    resources :contacts, only: %i[index]
     get "entities", to: "entities#index"
+    get "entities/:entity_type/records", to: "records#index", as: :entity_records
   end
 
   # Basic UI
@@ -19,7 +19,7 @@ Rails.application.routes.draw do
     resources :bulk_actions, only: %i[index new create show] do
       post :cancel, on: :member
     end
-    resources :contacts, only: %i[index]
+    get "entities/:entity_type", to: "records#index", as: :records
   end
 
   mount Sidekiq::Web => "/sidekiq"

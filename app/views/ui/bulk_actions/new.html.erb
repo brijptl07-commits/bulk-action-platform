@@ -17,7 +17,9 @@
       </div>
       <div class="field">
         <%= f.label :entity_type, "Entity" %>
-        <%= f.select :entity_type, BulkActions::EntityRegistry.names.map { |n| [n.humanize, n] }, selected: @form["entity_type"] %>
+        <%= f.select :entity_type, BulkActions::EntityRegistry.all.map { |e| ["#{e.label} (#{number_with_delimiter(e.model.count)})", e.name] },
+                     { selected: @entity.name },
+                     onchange: "Turbo.visit('#{new_ui_bulk_action_path}?entity_type=' + this.value)" %>
       </div>
       <div class="field">
         <%= f.label :action_type, "Action" %>
@@ -26,44 +28,51 @@
 
       <h2>2. Fields to update</h2>
       <% fields = @form["fields"] || {}; enabled = @form["update"] || {} %>
-      <div class="update-row">
-        <label class="inline"><%= check_box_tag "form[update][name]", "1", enabled["name"] == "1" %> Name</label>
-        <%= text_field_tag "form[fields][name]", fields["name"] %>
-      </div>
-      <div class="update-row">
-        <label class="inline"><%= check_box_tag "form[update][email]", "1", enabled["email"] == "1" %> Email</label>
-        <%= text_field_tag "form[fields][email]", fields["email"] %>
-      </div>
-      <div class="update-row">
-        <label class="inline"><%= check_box_tag "form[update][age]", "1", enabled["age"] == "1" %> Age</label>
-        <%= text_field_tag "form[fields][age]", fields["age"] %>
-      </div>
-      <div class="update-row">
-        <label class="inline"><%= check_box_tag "form[update][status]", "1", enabled["status"] == "1" %> Status</label>
-        <%= select_tag "form[fields][status]", options_for_select(Contact::STATUSES, fields["status"]) %>
-      </div>
-      <div class="hint">Tick the fields you want to change.</div>
+      <% @entity.updatable_fields.each do |field| %>
+        <div class="update-row">
+          <label class="inline"><%= check_box_tag "form[update][#{field}]", "1", enabled[field] == "1" %> <%= field.humanize %></label>
+          <%= render "field_input", field: field, spec: @entity.field(field), value: fields[field] %>
+        </div>
+      <% end %>
+      <div class="hint">Tick the fields you want to change. The same values are applied to every targeted record.</div>
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">3. Which records</h2>
-      <div class="field">
-        <label class="inline"><%= radio_button_tag "form[target]", "where", @form["target"] == "where" %> Contacts with status</label>
-        <%= select_tag "form[where_status]", options_for_select(Contact::STATUSES, @form["where_status"]) %>
-      </div>
+      <h2 style="margin-top:0">3. Which <%= @entity.label.downcase %></h2>
+      <% if @entity.filterable_fields.any? %>
+        <div class="field">
+          <label class="inline"><%= radio_button_tag "form[target]", "where", @form["target"] == "where" %> Where field equals</label>
+          <div class="inline">
+            <%= select_tag "form[where_field]", options_for_select(@entity.filterable_fields.map { |x| [x.humanize, x] }, @form["where_field"]), style: "width:45%" %>
+            <%= text_field_tag "form[where_value]", @form["where_value"], placeholder: "value (comma separated for many)", list: "where-options" %>
+          </div>
+          <datalist id="where-options">
+            <% @entity.filterable_fields.flat_map { |x| @entity.field(x)&.dig("options") || [] }.uniq.each do |opt| %>
+              <option value="<%= opt %>"></option>
+            <% end %>
+          </datalist>
+          <div class="hint">
+            <% @entity.filterable_fields.each do |x| %>
+              <% if (opts = @entity.field(x)&.dig("options")) %><div><b><%= x.humanize %>:</b> <%= opts.join(", ") %></div><% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
       <div class="field">
         <label class="inline"><%= radio_button_tag "form[target]", "ids", @form["target"] == "ids" %> Specific IDs</label>
         <%= text_area_tag "form[ids]", @form["ids"], rows: 3, placeholder: "1, 2, 3, 42" %>
       </div>
       <div class="field">
-        <label class="inline"><%= radio_button_tag "form[target]", "all", @form["target"] == "all" %> All contacts (<%= number_with_delimiter(Contact.count) %>)</label>
+        <label class="inline"><%= radio_button_tag "form[target]", "all", @form["target"] == "all" %> All <%= @entity.label.downcase %> (<%= number_with_delimiter(@entity.model.count) %>)</label>
       </div>
 
       <h2>4. Options</h2>
-      <div class="field">
-        <label class="inline"><%= check_box_tag "form[dedupe]", "1", @form["dedupe"] == "1" %> Skip duplicates by email</label>
-        <div class="hint">Only the first record per email is processed; others are logged as skipped.</div>
-      </div>
+      <% if @entity.dedupe_field %>
+        <div class="field">
+          <label class="inline"><%= check_box_tag "form[dedupe]", "1", @form["dedupe"] == "1" %> Skip duplicates by <%= @entity.dedupe_field %></label>
+          <div class="hint">Only the first record per <%= @entity.dedupe_field %> is processed; others are logged as skipped.</div>
+        </div>
+      <% end %>
       <div class="field">
         <%= label_tag "form[scheduled_at]", "Schedule for later (optional)" %>
         <%= datetime_local_field_tag "form[scheduled_at]", @form["scheduled_at"] %>

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_10_05_171908) do
+ActiveRecord::Schema[7.0].define(version: 2026_10_05_181843) do
   create_table "bulk_action_logs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bulk_action_id", null: false
     t.bigint "entity_id", null: false
@@ -45,6 +45,19 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_171908) do
     t.index ["status"], name: "index_bulk_actions_on_status"
   end
 
+  create_table "companies", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "domain"
+    t.string "industry"
+    t.integer "employee_count"
+    t.string "status", default: "prospect", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["domain"], name: "index_companies_on_domain"
+    t.index ["industry"], name: "index_companies_on_industry"
+    t.index ["status"], name: "index_companies_on_status"
+  end
+
   create_table "contacts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "name", null: false
     t.string "email"
@@ -56,5 +69,47 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_171908) do
     t.index ["status"], name: "index_contacts_on_status"
   end
 
+  create_table "leads", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "email"
+    t.string "company_name"
+    t.string "source"
+    t.integer "score"
+    t.string "status", default: "new", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_leads_on_email"
+    t.index ["source"], name: "index_leads_on_source"
+    t.index ["status"], name: "index_leads_on_status"
+  end
+
+  create_table "opportunities", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.bigint "company_id"
+    t.decimal "amount", precision: 12, scale: 2
+    t.string "stage", default: "prospecting", null: false
+    t.integer "probability"
+    t.date "close_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["company_id"], name: "index_opportunities_on_company_id"
+    t.index ["stage"], name: "index_opportunities_on_stage"
+  end
+
+  create_table "tasks", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "title", null: false
+    t.text "description"
+    t.string "status", default: "todo", null: false
+    t.string "priority", default: "medium", null: false
+    t.date "due_date"
+    t.string "assignee"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["assignee"], name: "index_tasks_on_assignee"
+    t.index ["priority"], name: "index_tasks_on_priority"
+    t.index ["status"], name: "index_tasks_on_status"
+  end
+
   add_foreign_key "bulk_action_logs", "bulk_actions"
+  add_foreign_key "opportunities", "companies"
 end

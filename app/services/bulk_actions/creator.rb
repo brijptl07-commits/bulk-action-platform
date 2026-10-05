@@ -15,8 +15,11 @@ module BulkActions
       payload = @params["payload"] || {}
       filters = @params["filters"] || {}
 
+      dedupe = ActiveModel::Type::Boolean.new.cast(@params["dedupe"]) || false
+
       errors = []
       errors << "account_id is required" if @params["account_id"].blank?
+      errors << "dedupe is not supported for #{entity.name} (no dedupe field)" if dedupe && entity.dedupe_field.nil?
       raise InvalidRequest, errors if errors.any?
 
       ScopeBuilder.validate!(entity, filters)
@@ -29,7 +32,7 @@ module BulkActions
         action_type: @params["action_type"].to_s,
         payload: payload,
         filters: filters,
-        dedupe: ActiveModel::Type::Boolean.new.cast(@params["dedupe"]) || false,
+        dedupe: dedupe,
         scheduled_at: scheduled_at,
         status: scheduled_at ? "scheduled" : "queued"
       )

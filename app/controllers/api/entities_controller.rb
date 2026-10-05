@@ -4,7 +4,7 @@ module Api
     def index
       render json: {
         data: {
-          entities: BulkActions::EntityRegistry.all.map(&:to_h).map { |e| e.except(:model_name) },
+          entities: BulkActions::EntityRegistry.all,
           actions: BulkActions::ActionRegistry.names
         }
       }

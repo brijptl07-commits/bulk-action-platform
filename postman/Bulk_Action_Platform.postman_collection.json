@@ -177,18 +177,72 @@
           }
         },
         {
-          "name": "List contacts",
+          "name": "List entity records",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/contacts?page=1&per_page=25",
+              "raw": "{{baseUrl}}/entities/contact/records?page=1&per_page=25",
               "host": ["{{baseUrl}}"],
-              "path": ["contacts"],
+              "path": ["entities", "contact", "records"],
               "query": [
                 { "key": "page", "value": "1" },
                 { "key": "per_page", "value": "25" },
-                { "key": "status", "value": "lead", "disabled": true }
+                { "key": "status", "value": "lead", "disabled": true, "description": "Any filterable field of the entity" }
               ]
+            },
+            "description": "entity_type: contact, company, lead, opportunity, task"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Update - other entities",
+      "item": [
+        {
+          "name": "Companies - activate prospects (dedupe by domain)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"company\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"prospect\" } },\n  \"payload\": { \"fields\": { \"status\": \"active\", \"industry\": \"logistics\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Leads - qualify new & contacted (dedupe by email)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"lead\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": [\"new\", \"contacted\"] } },\n  \"payload\": { \"fields\": { \"status\": \"qualified\", \"score\": 80 } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Opportunities - close negotiation deals",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"opportunity\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"stage\": \"negotiation\" } },\n  \"payload\": { \"fields\": { \"stage\": \"closed_won\", \"probability\": 100, \"close_date\": \"2026-10-31\" } }\n}"
+            }
+          }
+        },
+        {
+          "name": "Tasks - complete high priority and reassign",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"task\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"priority\": \"high\" } },\n  \"payload\": { \"fields\": { \"status\": \"done\", \"assignee\": \"brij\" } }\n}"
             }
           }
         }

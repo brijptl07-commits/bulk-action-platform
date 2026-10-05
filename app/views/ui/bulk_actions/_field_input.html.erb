@@ -1,0 +1,15 @@
+<% name = "form[fields][#{field}]" %>
+<% case spec["type"] %>
+<% when "select" %>
+  <%= select_tag name, options_for_select(spec["options"], value) %>
+<% when "integer" %>
+  <%= number_field_tag name, value, step: 1 %>
+<% when "decimal" %>
+  <%= number_field_tag name, value, step: "0.01" %>
+<% when "date" %>
+  <%= date_field_tag name, value %>
+<% when "text" %>
+  <%= text_area_tag name, value, rows: 2 %>
+<% else %>
+  <%= text_field_tag name, value %>
+<% end %>

@@ -2,7 +2,7 @@ namespace :bulk do
   desc "End-to-end throughput test. Requires Sidekiq running. Usage: rake bulk:load_test[account_id]"
   task :load_test, [:account_id] => :environment do |_t, args|
     count = Contact.count
-    abort "No contacts. Run: rake contacts:seed[20000]" if count.zero?
+    abort "No contacts. Run: rake crm:seed[20000,contact]" if count.zero?
 
     bulk_action = BulkActions::Creator.call(
       "account_id" => args[:account_id] || "load_test_#{Time.now.to_i}",

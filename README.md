@@ -1,12 +1,13 @@
 # Bulk Action Platform
 
-A scalable, extensible platform for running bulk actions (starting with **Bulk Update**) on CRM entities
-(starting with **Contact**). Built with **Ruby on Rails 7, MySQL, Sidekiq and Redis**.
+A scalable, extensible platform for running bulk actions (starting with **Bulk Update**) on CRM entities —
+**Contacts, Companies, Leads, Opportunities and Tasks**. Built with **Ruby on Rails 7, MySQL, Sidekiq and Redis**.
 
 - JSON API exactly as specified (`/bulk-actions`, `/bulk-actions/:id`, `/bulk-actions/:id/stats`) plus logs and cancel
+- Five CRM entities out of the box, all driven by the same pipeline and handler code
 - Batch processing in parallel Sidekiq workers (horizontally scalable)
 - Per-record logs (success / failed / skipped) and summary stats
-- Optional enhancements implemented: **rate limiting per account**, **de-duplication by email**, **scheduling**
+- Optional enhancements implemented: **rate limiting per account**, **de-duplication** (email / domain), **scheduling**
 - Basic UI for creating actions, watching live progress and filtering logs
 
 ---
@@ -42,7 +43,7 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
    └──────────────────┬───────────────────────┘
                       ▼
                  ┌──────────────┐
-                 │    MySQL     │  contacts, bulk_actions, bulk_action_logs
+                 │    MySQL     │  CRM entity tables, bulk_actions, bulk_action_logs
                  └──────────────┘
 ```
 
@@ -60,7 +61,18 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
 
 ### Data model
 
-- `contacts` — sample entity: `name, email, age, status`
+CRM entities (each registered in `config/initializers/bulk_actions.rb`):
+
+| Entity | Table | Updatable fields | Filterable fields | Dedupe key |
+|---|---|---|---|---|
+| Contact | `contacts` | name, email, age, status | status, age, email | email |
+| Company | `companies` | name, domain, industry, employee_count, status | status, industry, domain | domain |
+| Lead | `leads` | name, email, company_name, source, score, status | status, source, email | email |
+| Opportunity | `opportunities` | name, amount, stage, probability, close_date | stage, company_id | — |
+| Task | `tasks` | title, description, status, priority, due_date, assignee | status, priority, assignee | — |
+
+Platform tables:
+
 - `bulk_actions` — `account_id, entity_type, action_type, status, payload (json), filters (json), dedupe, total/processed/success/failure/skipped counts, scheduled_at, started_at, planned_at, completed_at, error_message`
 - `bulk_action_logs` — `bulk_action_id, entity_id, status (success|failed|skipped), message` — indexed by `(bulk_action_id, status)` and unique `(bulk_action_id, entity_id)`
 
@@ -90,16 +102,21 @@ app/controllers/ui/*      # basic UI
 
 ## Extending
 
-**Add a new entity (e.g. Lead)** — create the model/migration, then register it:
+**Add a new entity (e.g. Invoice)** — create the model/migration, then register it. Field types drive the UI
+form inputs (`:string`, `:text`, `:integer`, `:decimal`, `:date`, or an Array of allowed options → dropdown):
 
 ```ruby
 BulkActions::EntityRegistry.register(
-  :lead, model: "Lead",
-  updatable_fields: %i[name email stage owner_id],
-  filterable_fields: %i[stage owner_id],
-  dedupe_field: :email
+  :invoice, model: "Invoice",
+  fields: { number: :string, amount: :decimal, due_date: :date, status: Invoice::STATUSES },
+  filterable_fields: %i[status],
+  dedupe_field: :number          # optional
 )
 ```
+
+This is exactly how Companies, Leads, Opportunities and Tasks were added — no changes to the planner, batch
+worker, handlers, API or UI were needed. The UI form, record browser (`/ui/entities/:entity_type`) and
+`GET /entities/:entity_type/records` pick the new entity up automatically.
 
 **Add a new action (e.g. Bulk Delete)** — one handler class + one line:
 
@@ -130,9 +147,10 @@ cp .env.example .env            # set DB_PASSWORD etc.
 docker compose up -d redis      # Redis 7 on localhost:6380 (skip if you have Redis 6+)
 
 bin/rails db:create db:migrate
-bin/rails db:seed                          # 5,000 contacts (~5% duplicate emails)
-bin/rails "contacts:seed[20000]"           # optional: more contacts
-bin/rails "contacts:import[db/sample_contacts.csv]"   # optional: import a CSV
+bin/rails db:seed                          # 2,000 records per entity (~5% duplicate emails/domains)
+bin/rails "crm:seed[20000,contact]"        # optional: more records for one entity
+bin/rails "crm:seed[5000]"                 # optional: more records for every entity
+bin/rails "contacts:import[db/sample_contacts.csv]"   # optional: import contacts from CSV
 
 # run (two terminals)
 bin/rails server
@@ -173,8 +191,22 @@ All endpoints return JSON. Errors: `422 { "errors": [...] }`, `404` for unknown 
 }
 ```
 
-- `filters`: one of `{ "ids": [1,2,3] }`, `{ "where": { "status": "lead" } }` (equality / array = IN), `{ "all": true }`
-- `dedupe` (optional): skip records whose email was already seen in this action; they are logged as `skipped`
+- `entity_type`: `contact`, `company`, `lead`, `opportunity`, `task`
+- `filters`: one of `{ "ids": [1,2,3] }`, `{ "where": { "status": "lead" } }` (equality / array = IN, filterable fields only), `{ "all": true }`
+- `payload.fields`: any of the entity's updatable fields; values are validated per record with the model's validations
+- `dedupe` (optional): skip records whose dedupe key (email for contacts/leads, domain for companies) was already seen in this action; they are logged as `skipped`. Rejected for entities without a dedupe key.
+
+More examples:
+
+```json
+{ "account_id": "acc_1", "entity_type": "opportunity", "action_type": "bulk_update",
+  "filters": { "where": { "stage": "negotiation" } },
+  "payload": { "fields": { "stage": "closed_won", "probability": 100, "close_date": "2026-10-31" } } }
+
+{ "account_id": "acc_1", "entity_type": "task", "action_type": "bulk_update",
+  "filters": { "where": { "priority": "high" } },
+  "payload": { "fields": { "status": "done", "assignee": "brij" } } }
+```
 - `scheduled_at` (optional): ISO-8601 time; status is `scheduled` until then
 
 Returns `201` with the bulk action.
@@ -199,7 +231,8 @@ Query: `status` (`success,failed,skipped`), `entity_id`, `page`, `per_page` (max
 Cancels a scheduled/queued/in-progress action; remaining batches become no-ops.
 
 ### Helpers
-`GET /entities` (registered entities & actions), `GET /contacts`.
+- `GET /entities` — registered entities (fields, types, options, filterable fields, dedupe key) and actions
+- `GET /entities/:entity_type/records` — browse records of any entity; any filterable field can be a query param
 
 ---
 
@@ -210,9 +243,10 @@ atomically (Lua script) reserves `n` units in a Redis counter keyed by `account 
 would exceed `RATE_LIMIT_PER_MINUTE` (default 10k), the batch is re-scheduled to the start of the next window instead
 of being dropped. The limit is shared across all workers/processes.
 
-**De-duplication** — when `dedupe: true`, the planner walks records in id order and `SADD`s each normalized email
-into a per-action Redis set. If the email was already present, the record is passed to the batch as a duplicate and
-logged as `skipped` with message `Duplicate email`. The set expires automatically and is deleted after planning.
+**De-duplication** — when `dedupe: true`, the planner walks records in id order and `SADD`s each normalized value of
+the entity's dedupe key (email for contacts and leads, domain for companies) into a per-action Redis set. If the
+value was already present, the record is passed to the batch as a duplicate and logged as `skipped` with message
+`Duplicate email` / `Duplicate domain`. The set expires automatically and is deleted after planning.
 
 **Scheduling** — `scheduled_at` uses Sidekiq's scheduled set (`perform_at`). The action stays `scheduled`
 (visible in the list and cancellable) until it starts.
@@ -222,7 +256,7 @@ logged as `skipped` with message `Duplicate email`. The set expires automaticall
 ## Load test
 
 ```bash
-bin/rails "contacts:seed[20000]"
+bin/rails "crm:seed[18000,contact]"   # 20,000 contacts in total
 bin/rails "bulk:load_test"
 ```
 

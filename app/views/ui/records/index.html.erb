@@ -1,0 +1,50 @@
+<div class="page-head">
+  <h1><%= @entity.label %> <span class="muted" style="font-size:14px; font-weight:normal"><%= number_with_delimiter(@records.total_count) %> records</span></h1>
+  <%= link_to "+ Bulk update #{@entity.label.downcase}", new_ui_bulk_action_path(entity_type: @entity.name), class: "btn btn-primary" %>
+</div>
+
+<div class="tabs">
+  <% BulkActions::EntityRegistry.all.each do |e| %>
+    <%= link_to e.label, ui_records_path(e.name), class: ("active" if e.name == @entity.name) %>
+  <% end %>
+</div>
+
+<%= form_with url: ui_records_path(@entity.name), method: :get, class: "inline card" do %>
+  <%= text_field_tag :id, params[:id], placeholder: "ID", style: "width:90px" %>
+  <% @filters.each do |f| %>
+    <%= select_tag f, options_for_select(@entity.field(f)["options"], params[f]), include_blank: "Any #{f.humanize.downcase}", style: "width:auto" %>
+  <% end %>
+  <%= submit_tag "Filter", class: "btn", name: nil %>
+  <%= link_to "Reset", ui_records_path(@entity.name), class: "btn" %>
+<% end %>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <% @columns.each do |c| %><th><%= c.humanize %></th><% end %>
+      <th>Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @records.each do |r| %>
+      <tr>
+        <td class="mono"><%= r.id %></td>
+        <% @columns.each do |c| %>
+          <td>
+            <% if @entity.field(c)["type"] == "select" %>
+              <span class="badge"><%= r[c] %></span>
+            <% else %>
+              <%= r[c] %>
+            <% end %>
+          </td>
+        <% end %>
+        <td class="muted"><%= time_ago_in_words(r.updated_at) %> ago</td>
+      </tr>
+    <% end %>
+    <% if @records.empty? %>
+      <tr><td colspan="<%= @columns.size + 2 %>" class="muted">No records.</td></tr>
+    <% end %>
+  </tbody>
+</table>
+<%= paginate @records %>
