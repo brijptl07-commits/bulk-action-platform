@@ -21,12 +21,12 @@ module BulkActions
         fields = payload["fields"].stringify_keys
         guard = FieldVersionGuard.new(bulk_action, entity)
 
-        guard.synchronize(records.map(&:id), fields.keys) do |locked|
+        guard.track(records, fields.keys) do
           results = []
           groups = Hash.new { |h, k| h[k] = [] }
           notes = {}
 
-          locked.each do |record|
+          records.each do |record|
             allowed, superseded_by = guard.partition(record.id, fields.keys)
             if allowed.empty?
               results << skipped(record, "Superseded by newer bulk action #{superseded_by.map { |id| "##{id}" }.join(', ')}")

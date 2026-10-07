@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+# A container stopped without a clean shutdown leaves Puma's pid file behind and blocks the next start.
+rm -f tmp/pids/server.pid
+
+exec "$@"

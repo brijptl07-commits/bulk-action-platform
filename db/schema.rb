@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2026_10_05_192409) do
+ActiveRecord::Schema[7.0].define(version: 2026_10_06_180000) do
   create_table "bulk_action_logs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bulk_action_id", null: false
     t.bigint "entity_id", null: false
@@ -47,13 +47,12 @@ ActiveRecord::Schema[7.0].define(version: 2026_10_05_192409) do
     t.index ["status"], name: "index_bulk_actions_on_status"
   end
 
-  create_table "bulk_field_versions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+  create_table "bulk_field_versions", primary_key: ["entity_type", "entity_id", "field"], charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "entity_type", null: false
     t.bigint "entity_id", null: false
     t.string "field", null: false
     t.bigint "bulk_action_id", null: false
     t.datetime "effective_at", null: false
-    t.index ["entity_type", "entity_id", "field"], name: "index_bulk_field_versions_on_entity_field", unique: true
   end
 
   create_table "companies", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|

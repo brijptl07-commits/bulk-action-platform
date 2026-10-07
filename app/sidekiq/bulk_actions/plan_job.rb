@@ -1,48 +1,66 @@
 module BulkActions
-  # Step 1: walks the target records with keyset pagination (WHERE id > last ORDER BY id LIMIT n),
-  # snapshots their ids, applies de-duplication and fans out one BatchJob per chunk.
-  # Never loads the full result set into memory, so it scales to millions of rows.
+  # Step 1: one job per bulk action. Walks the target records and enqueues a BatchJob per page.
+  #
+  # Planning is restartable: if this job crashes (or the worker is killed) part-way, a retry or
+  # RecoveryJob runs it again from the start. That is safe because batches skip records that are
+  # already logged, the dedupe set is rebuilt, and total_count is overwritten rather than added to.
+  # A Redis lease with a heartbeat makes sure only one planner works on an action at a time.
   class PlanJob
     include Sidekiq::Job
-    sidekiq_options queue: "bulk_actions", retry: 0
+    sidekiq_options queue: "bulk_actions", retry: 3
+
+    LEASE_TTL = 60
+
+    sidekiq_retries_exhausted do |job, error|
+      BulkAction.where(id: job["args"].first, status: "in_progress", planned_at: nil)
+                .update_all(status: "failed", error_message: "#{error.class}: #{error.message}",
+                            completed_at: Time.current, updated_at: Time.current)
+    end
+
+    def self.lease_key(bulk_action_id)
+      "bulk_actions:planning:#{bulk_action_id}"
+    end
 
     def perform(bulk_action_id)
       bulk_action = BulkAction.find_by(id: bulk_action_id)
-      return unless bulk_action
-      # The sequence orders actions by start time: on any record, a later-started action always wins.
-      return unless bulk_action.transition!(from: %w[queued scheduled], to: "in_progress", started_at: Time.current,
-                                            sequence: Sequence.next(:bulk_action))
+      return unless bulk_action && start_or_resume(bulk_action)
 
-      entity = bulk_action.entity_config
-      scope = ScopeBuilder.new(entity, bulk_action.filters).relation
-      dedupe_field = bulk_action.dedupe ? entity.dedupe_field : nil
-      deduplicator = Deduplicator.new(bulk_action) if dedupe_field
-      columns = [:id, dedupe_field].compact
-      batch_size = Config.batch_size
-      last_id = 0
+      lease = RedisLease.acquire(self.class.lease_key(bulk_action.id), ttl: LEASE_TTL)
+      return unless lease
 
-      loop do
-        rows = scope.where("#{entity.model.quoted_table_name}.id > ?", last_id).order(:id).limit(batch_size).pluck(*columns)
-        break if rows.empty?
+      begin
+        plan(bulk_action, lease)
+      ensure
+        lease.release!
+      end
+      BulkAction.complete_if_done!(bulk_action.id)
+    end
 
-        rows = rows.map { |r| Array(r) }
-        last_id = rows.last.first
-        ids, duplicate_ids = deduplicator ? deduplicator.split(rows) : [rows.map(&:first), []]
+    private
 
-        BulkAction.update_counters(bulk_action.id, total_count: rows.size)
-        BatchJob.perform_async(bulk_action.id, ids, duplicate_ids)
+    def start_or_resume(bulk_action)
+      return true if bulk_action.transition!(from: %w[queued scheduled], to: "in_progress", started_at: Time.current,
+                                             sequence: Sequence.next(:bulk_action))
 
+      bulk_action.reload.in_progress? && bulk_action.planned_at.nil?
+    end
+
+    def plan(bulk_action, lease)
+      planner = Planner.new(bulk_action)
+      # Estimate up front so progress is meaningful while planning; the exact total is written once at
+      # the end. Updating the bulk_actions row after every page would contend with the BatchJobs that
+      # update its counters.
+      bulk_action.update_columns(total_count: planner.count, updated_at: Time.current)
+
+      planned = 0
+      planner.each_page do |page|
+        planned += page.size
+        BatchJob.perform_async(bulk_action.id, page.ids, page.duplicate_ids)
+        lease.refresh!
         break if BulkAction.where(id: bulk_action.id, status: "cancelled").exists?
       end
 
-      bulk_action.update_columns(planned_at: Time.current, updated_at: Time.current)
-      BulkAction.complete_if_done!(bulk_action.id)
-    rescue StandardError => e
-      BulkAction.where(id: bulk_action_id, status: "in_progress")
-                .update_all(status: "failed", error_message: "#{e.class}: #{e.message}", completed_at: Time.current)
-      raise
-    ensure
-      deduplicator&.cleanup
+      bulk_action.update_columns(total_count: planned, planned_at: Time.current, updated_at: Time.current)
     end
   end
 end

@@ -1,17 +1,68 @@
-services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6380:6379"
+# Whole stack: docker compose up --build   →  http://localhost:3000
+# More workers:  docker compose up -d --scale worker=4
 
+x-app: &app
+  build: .
+  image: bulk_action_platform
+  environment:
+    RAILS_ENV: development
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_USERNAME: root
+    DB_PASSWORD: root
+    REDIS_URL: redis://redis:6379/0
+    SIDEKIQ_CONCURRENCY: 10
+    BULK_BATCH_SIZE: 500
+    RATE_LIMIT_PER_MINUTE: 15000
+    SEED_COUNT: 5000
+    SEED_CONTACT_COUNT: 100000
+
+services:
   mysql:
     image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD: root
-    ports:
-      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: creates/migrates the database and seeds sample records for every entity (skipped if present).
+  setup:
+    <<: *app
+    command: bash -c "bin/rails db:prepare && bin/rails db:seed"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: bundle exec sidekiq -C config/sidekiq.yml
+    depends_on:
+      setup:
+        condition: service_completed_successfully
 
 volumes:
   mysql_data:

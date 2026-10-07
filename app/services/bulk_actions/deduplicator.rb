@@ -3,8 +3,8 @@ module BulkActions
   # The first occurrence (lowest id, since planning walks ids in order) wins. A Redis set holds
   # the values seen so far, so memory stays flat even for millions of records.
   class Deduplicator
-    def initialize(bulk_action)
-      @key = "bulk_actions:dedupe:#{bulk_action.id}"
+    def initialize(bulk_action, namespace = "plan")
+      @key = "bulk_actions:dedupe:#{bulk_action.id}:#{namespace}"
     end
 
     # rows: [[id, value], ...]

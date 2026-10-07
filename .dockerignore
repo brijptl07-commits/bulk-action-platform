@@ -1,0 +1,9 @@
+.git
+.env
+log/*
+tmp/*
+!log/.keep
+!tmp/.keep
+!tmp/pids/.keep
+public/assets
+node_modules

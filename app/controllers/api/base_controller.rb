@@ -1,5 +1,16 @@
 module Api
   class BaseController < ActionController::API
+    # Must stay first: rescue_from handlers declared later take precedence.
+    rescue_from StandardError do |e|
+      Rails.logger.error("#{e.class}: #{e.message}\n#{e.backtrace&.first(10)&.join("\n")}")
+      message = Rails.env.production? ? "Internal server error" : "#{e.class}: #{e.message}"
+      render json: { errors: [message] }, status: :internal_server_error
+    end
+
+    rescue_from ActionDispatch::Http::Parameters::ParseError do |e|
+      render json: { errors: ["Malformed JSON body: #{e.message}"] }, status: :bad_request
+    end
+
     rescue_from BulkActions::InvalidRequest do |e|
       render json: { errors: e.errors }, status: :unprocessable_entity
     end
@@ -10,6 +21,10 @@ module Api
 
     rescue_from ActionController::ParameterMissing do |e|
       render json: { errors: [e.message] }, status: :bad_request
+    end
+
+    def route_not_found
+      render json: { errors: ["No route matches #{request.request_method} #{request.path}"] }, status: :not_found
     end
 
     private

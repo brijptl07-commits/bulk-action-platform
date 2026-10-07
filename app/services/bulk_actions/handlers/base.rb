@@ -16,7 +16,8 @@ module BulkActions
         @payload = bulk_action.payload
       end
 
-      # records: Array of loaded model instances for one batch.
+      # records: the batch's model instances, already locked (SELECT ... FOR UPDATE). Runs inside the batch
+      # transaction, so every write here commits or rolls back together with the batch's logs and counters.
       # Must return Array<Result> with one entry per record.
       def call(_records)
         raise NotImplementedError

@@ -56,6 +56,12 @@ class BulkAction < ApplicationRecord
     updated.positive?
   end
 
+  # Removes ids that already have a log row for this action (i.e. were already processed).
+  def without_logged(*id_lists)
+    logged = logs.where(entity_id: id_lists.flatten).pluck(:entity_id).to_set
+    id_lists.map { |list| list.reject { |id| logged.include?(id) } }
+  end
+
   # Marks the action completed once planning is done and every planned record is processed.
   def self.complete_if_done!(id)
     where(id: id, status: "in_progress")

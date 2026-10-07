@@ -42,6 +42,7 @@ module BulkActions
       else
         PlanJob.perform_async(bulk_action.id)
       end
+      RecoveryJob.ensure_scheduled
 
       bulk_action
     end

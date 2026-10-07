@@ -1,12 +1,18 @@
 {
   "info": {
     "name": "Bulk Action Platform",
-    "description": "API for creating and tracking bulk actions on CRM entities. Set the `baseUrl` variable (default http://localhost:3000). Creating a bulk action stores its id in `bulkActionId` for the follow-up requests.",
+    "description": "Bulk Action Platform API. All endpoints accept and return JSON (`application/json`), including errors, which use the shape `{ \"errors\": [\"...\"] }`.\n\nSetup: set the `baseUrl` collection variable (default `http://localhost:3000`). Running any **Create** request stores the new id in `bulkActionId`, which the Get / Stats / Logs / Cancel requests use.\n\nEvery request has a saved example response (captured from a running server) and test scripts asserting the status code and that the response is JSON, so the whole collection can be run with the Collection Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000" },
-    { "key": "bulkActionId", "value": "1" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "bulkActionId",
+      "value": "1"
+    }
   ],
   "item": [
     {
@@ -20,7 +26,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
                   "const id = pm.response.json().data && pm.response.json().data.id;",
                   "if (id) pm.collectionVariables.set('bulkActionId', id);"
                 ]
@@ -29,13 +39,72 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"lead\" } },\n  \"payload\": { \"fields\": { \"status\": \"prospect\" } }\n}"
             }
-          }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"lead\" } },\n  \"payload\": { \"fields\": { \"status\": \"prospect\" } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"prospect\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"status\": \"lead\"\n      }\n    },\n    \"dedupe\": true,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create - update multiple fields by ids",
@@ -45,6 +114,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
                   "const id = pm.response.json().data && pm.response.json().data.id;",
                   "if (id) pm.collectionVariables.set('bulkActionId', id);"
                 ]
@@ -53,61 +127,423 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [1, 2, 3, 4, 5] },\n  \"payload\": { \"fields\": { \"name\": \"Updated Name\", \"age\": 35, \"status\": \"customer\" } }\n}"
             }
-          }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [1, 2, 3, 4, 5] },\n  \"payload\": { \"fields\": { \"name\": \"Updated Name\", \"age\": 35, \"status\": \"customer\" } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"name\": \"Updated Name\",\n        \"age\": 35,\n        \"status\": \"customer\"\n      }\n    },\n    \"filters\": {\n      \"ids\": [\n        1,\n        2,\n        3,\n        4,\n        5\n      ]\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create - all contacts",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_2\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"age\": 30 } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_2\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"age\": 30 } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_2\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"age\": 30\n      }\n    },\n    \"filters\": {\n      \"all\": true\n    },\n    \"dedupe\": true,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create - scheduled for later",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"scheduled_at\": \"2026-11-22T23:15:00+05:30\",\n  \"filters\": { \"where\": { \"status\": \"churned\" } },\n  \"payload\": { \"fields\": { \"status\": \"lead\" } }\n}"
+              "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"scheduled_at\": \"2027-11-22T23:15:00+05:30\",\n  \"filters\": {\n    \"where\": {\n      \"status\": \"churned\"\n    }\n  },\n  \"payload\": {\n    \"fields\": {\n      \"status\": \"lead\"\n    }\n  }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created (scheduled)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"scheduled_at\": \"2027-11-22T23:15:00+05:30\",\n  \"filters\": {\n    \"where\": {\n      \"status\": \"churned\"\n    }\n  },\n  \"payload\": {\n    \"fields\": {\n      \"status\": \"lead\"\n    }\n  }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"scheduled\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"lead\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"status\": \"churned\"\n      }\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": \"2027-11-22T23:15:00.000+05:30\",\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create - validation errors (422)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"password\": \"secret\" } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has errors array', () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "422 Unprocessable Entity",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"all\": true },\n  \"payload\": { \"fields\": { \"password\": \"secret\" } }\n}"
+                }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Fields not updatable for contact: password. Allowed: name, email, age, status\"\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Create - per-record failures (age out of range)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [10, 11, 12] },\n  \"payload\": { \"fields\": { \"age\": 500 } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"contact\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"ids\": [10, 11, 12] },\n  \"payload\": { \"fields\": { \"age\": 500 } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"age\": 500\n      }\n    },\n    \"filters\": {\n      \"ids\": [\n        10,\n        11,\n        12\n      ]\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List bulk actions",
@@ -115,30 +551,338 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/bulk-actions?page=1&per_page=25",
-              "host": ["{{baseUrl}}"],
-              "path": ["bulk-actions"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "per_page", "value": "25" },
-                { "key": "status", "value": "in_progress,queued,scheduled", "disabled": true, "description": "Comma separated: scheduled, queued, in_progress, completed, failed, cancelled" },
-                { "key": "account_id", "value": "acc_1", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "25"
+                },
+                {
+                  "key": "status",
+                  "value": "in_progress,queued,scheduled",
+                  "disabled": true,
+                  "description": "Comma separated: scheduled, queued, in_progress, completed, failed, cancelled"
+                },
+                {
+                  "key": "account_id",
+                  "value": "acc_1",
+                  "disabled": true
+                }
               ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has data array and pagination meta', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j.meta).to.include.keys('page', 'per_page', 'total_count', 'total_pages');",
+                  "});",
+                  "const first = pm.response.json().data[0];",
+                  "if (first && !pm.collectionVariables.get('bulkActionId')) pm.collectionVariables.set('bulkActionId', first.id);"
+                ]
+              }
             }
-          }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions?page=1&per_page=3",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "3"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 48,\n      \"account_id\": \"acc_1\",\n      \"entity_type\": \"contact\",\n      \"action_type\": \"bulk_update\",\n      \"status\": \"cancelled\",\n      \"sequence\": null,\n      \"payload\": {\n        \"fields\": {\n          \"status\": \"lead\"\n        }\n      },\n      \"filters\": {\n        \"where\": {\n          \"status\": \"churned\"\n        }\n      },\n      \"dedupe\": false,\n      \"stats\": {\n        \"total\": 0,\n        \"processed\": 0,\n        \"success\": 0,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"pending\": 0,\n        \"progress_percent\": 100\n      },\n      \"scheduled_at\": \"2027-11-22T23:15:00.000+05:30\",\n      \"started_at\": null,\n      \"completed_at\": \"2026-10-06T18:23:28.359+05:30\",\n      \"error_message\": null,\n      \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n      \"updated_at\": \"2026-10-06T18:23:28.360+05:30\"\n    },\n    {\n      \"id\": 47,\n      \"account_id\": \"acc_1\",\n      \"entity_type\": \"contact\",\n      \"action_type\": \"bulk_update\",\n      \"status\": \"completed\",\n      \"sequence\": 26,\n      \"payload\": {\n        \"fields\": {\n          \"age\": 35\n        }\n      },\n      \"filters\": {\n        \"ids\": [\n          1\n        ]\n      },\n      \"dedupe\": false,\n      \"stats\": {\n        \"total\": 1,\n        \"processed\": 1,\n        \"success\": 1,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"pending\": 0,\n        \"progress_percent\": 100.0\n      },\n      \"scheduled_at\": null,\n      \"started_at\": \"2026-10-06T17:48:35.951+05:30\",\n      \"completed_at\": \"2026-10-06T17:48:36.079+05:30\",\n      \"error_message\": null,\n      \"created_at\": \"2026-10-06T17:48:35.892+05:30\",\n      \"updated_at\": \"2026-10-06T17:48:36.079+05:30\"\n    },\n    {\n      \"id\": 46,\n      \"account_id\": \"acc_1\",\n      \"entity_type\": \"lead\",\n      \"action_type\": \"bulk_update\",\n      \"status\": \"completed\",\n      \"sequence\": 25,\n      \"payload\": {\n        \"fields\": {\n          \"score\": 42\n        }\n      },\n      \"filters\": {\n        \"ids\": [\n          1,\n          2,\n          3\n        ]\n      },\n      \"dedupe\": false,\n      \"stats\": {\n        \"total\": 3,\n        \"processed\": 3,\n        \"success\": 3,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"pending\": 0,\n        \"progress_percent\": 100.0\n      },\n      \"scheduled_at\": null,\n      \"started_at\": \"2026-10-06T17:13:35.909+05:30\",\n      \"completed_at\": \"2026-10-06T17:13:36.041+05:30\",\n      \"error_message\": null,\n      \"created_at\": \"2026-10-06T17:13:35.855+05:30\",\n      \"updated_at\": \"2026-10-06T17:13:36.041+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 3,\n    \"total_count\": 47,\n    \"total_pages\": 16\n  }\n}"
+            },
+            {
+              "name": "200 OK - filtered by status & account",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions?status=completed&account_id=acc_1&page=1&per_page=2",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "completed"
+                    },
+                    {
+                      "key": "account_id",
+                      "value": "acc_1"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "2"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 47,\n      \"account_id\": \"acc_1\",\n      \"entity_type\": \"contact\",\n      \"action_type\": \"bulk_update\",\n      \"status\": \"completed\",\n      \"sequence\": 26,\n      \"payload\": {\n        \"fields\": {\n          \"age\": 35\n        }\n      },\n      \"filters\": {\n        \"ids\": [\n          1\n        ]\n      },\n      \"dedupe\": false,\n      \"stats\": {\n        \"total\": 1,\n        \"processed\": 1,\n        \"success\": 1,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"pending\": 0,\n        \"progress_percent\": 100.0\n      },\n      \"scheduled_at\": null,\n      \"started_at\": \"2026-10-06T17:48:35.951+05:30\",\n      \"completed_at\": \"2026-10-06T17:48:36.079+05:30\",\n      \"error_message\": null,\n      \"created_at\": \"2026-10-06T17:48:35.892+05:30\",\n      \"updated_at\": \"2026-10-06T17:48:36.079+05:30\"\n    },\n    {\n      \"id\": 46,\n      \"account_id\": \"acc_1\",\n      \"entity_type\": \"lead\",\n      \"action_type\": \"bulk_update\",\n      \"status\": \"completed\",\n      \"sequence\": 25,\n      \"payload\": {\n        \"fields\": {\n          \"score\": 42\n        }\n      },\n      \"filters\": {\n        \"ids\": [\n          1,\n          2,\n          3\n        ]\n      },\n      \"dedupe\": false,\n      \"stats\": {\n        \"total\": 3,\n        \"processed\": 3,\n        \"success\": 3,\n        \"failed\": 0,\n        \"skipped\": 0,\n        \"pending\": 0,\n        \"progress_percent\": 100.0\n      },\n      \"scheduled_at\": null,\n      \"started_at\": \"2026-10-06T17:13:35.909+05:30\",\n      \"completed_at\": \"2026-10-06T17:13:36.041+05:30\",\n      \"error_message\": null,\n      \"created_at\": \"2026-10-06T17:13:35.855+05:30\",\n      \"updated_at\": \"2026-10-06T17:13:36.041+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 2,\n    \"total_count\": 22,\n    \"total_pages\": 11\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get bulk action",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}"] }
-          }
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "{{bulkActionId}}"
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has data object', () => pm.expect(pm.response.json().data).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/44",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "44"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 44,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"completed\",\n    \"sequence\": 23,\n    \"payload\": {\n      \"fields\": {\n        \"name\": \"NAME2\"\n      }\n    },\n    \"filters\": {\n      \"all\": true\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 20000,\n      \"processed\": 20000,\n      \"success\": 13500,\n      \"failed\": 0,\n      \"skipped\": 6500,\n      \"pending\": 0,\n      \"progress_percent\": 100.0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": \"2026-10-06T16:47:29.538+05:30\",\n    \"completed_at\": \"2026-10-06T16:50:06.597+05:30\",\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T16:47:29.516+05:30\",\n    \"updated_at\": \"2026-10-06T16:50:06.597+05:30\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/999999",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "999999"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Couldn't find BulkAction with 'id'=999999\"\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Get bulk action stats",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/stats", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}", "stats"] }
-          }
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "{{bulkActionId}}",
+                "stats"
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has stats', () => pm.expect(pm.response.json().data).to.include.keys('total', 'processed', 'success', 'failed', 'skipped', 'pending', 'progress_percent'));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/44/stats",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "44",
+                    "stats"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 44,\n    \"status\": \"completed\",\n    \"total\": 20000,\n    \"processed\": 20000,\n    \"success\": 13500,\n    \"failed\": 0,\n    \"skipped\": 6500,\n    \"pending\": 0,\n    \"progress_percent\": 100.0\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get bulk action logs",
@@ -146,23 +890,313 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/logs?page=1&per_page=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["bulk-actions", "{{bulkActionId}}", "logs"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "{{bulkActionId}}",
+                "logs"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "per_page", "value": "50" },
-                { "key": "status", "value": "skipped", "disabled": true, "description": "success, failed, skipped (comma separated)" },
-                { "key": "entity_id", "value": "1", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "50"
+                },
+                {
+                  "key": "status",
+                  "value": "skipped",
+                  "disabled": true,
+                  "description": "success, failed, skipped (comma separated)"
+                },
+                {
+                  "key": "entity_id",
+                  "value": "1",
+                  "disabled": true
+                }
               ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has data array and pagination meta', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j.meta).to.include.keys('page', 'per_page', 'total_count', 'total_pages');",
+                  "});"
+                ]
+              }
             }
-          }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/44/logs?page=1&per_page=3",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "44",
+                    "logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "3"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 140467,\n      \"entity_id\": 1,\n      \"status\": \"success\",\n      \"message\": null,\n      \"created_at\": \"2026-10-06T16:47:29.918+05:30\"\n    },\n    {\n      \"id\": 140468,\n      \"entity_id\": 2,\n      \"status\": \"success\",\n      \"message\": null,\n      \"created_at\": \"2026-10-06T16:47:29.918+05:30\"\n    },\n    {\n      \"id\": 140469,\n      \"entity_id\": 3,\n      \"status\": \"success\",\n      \"message\": null,\n      \"created_at\": \"2026-10-06T16:47:29.918+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 3,\n    \"total_count\": 20000,\n    \"total_pages\": 6667\n  }\n}"
+            },
+            {
+              "name": "200 OK - skipped (duplicates)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/44/logs?status=skipped&page=1&per_page=2",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "44",
+                    "logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "skipped"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "2"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 158967,\n      \"entity_id\": 10501,\n      \"status\": \"skipped\",\n      \"message\": \"Superseded by newer bulk action #45\",\n      \"created_at\": \"2026-10-06T16:48:07.658+05:30\"\n    },\n    {\n      \"id\": 158968,\n      \"entity_id\": 10502,\n      \"status\": \"skipped\",\n      \"message\": \"Superseded by newer bulk action #45\",\n      \"created_at\": \"2026-10-06T16:48:07.658+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 2,\n    \"total_count\": 6500,\n    \"total_pages\": 3250\n  }\n}"
+            },
+            {
+              "name": "200 OK - failed (validation errors)",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/18/logs?status=failed&page=1&per_page=2",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "18",
+                    "logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "failed"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "2"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 70483,\n      \"entity_id\": 1,\n      \"status\": \"failed\",\n      \"message\": \"Score must be in 0..100\",\n      \"created_at\": \"2026-10-05T23:50:25.588+05:30\"\n    },\n    {\n      \"id\": 70484,\n      \"entity_id\": 2,\n      \"status\": \"failed\",\n      \"message\": \"Score must be in 0..100\",\n      \"created_at\": \"2026-10-05T23:50:25.588+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 2,\n    \"total_count\": 2,\n    \"total_pages\": 1\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Cancel bulk action",
           "request": {
             "method": "POST",
-            "url": { "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/cancel", "host": ["{{baseUrl}}"], "path": ["bulk-actions", "{{bulkActionId}}", "cancel"] }
-          }
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/{{bulkActionId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "{{bulkActionId}}",
+                "cancel"
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "description": "Cancels a scheduled, queued or in-progress bulk action. Returns 422 if it already finished."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 422', () => pm.expect(pm.response.code).to.be.oneOf([200, 422]));",
+                  "pm.test('Response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK - cancelled",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/48/cancel",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "48",
+                    "cancel"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "description": "Cancels a scheduled, queued or in-progress bulk action. Returns 422 if it already finished."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"contact\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"cancelled\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"lead\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"status\": \"churned\"\n      }\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 100\n    },\n    \"scheduled_at\": \"2027-11-22T23:15:00.000+05:30\",\n    \"started_at\": null,\n    \"completed_at\": \"2026-10-06T18:23:28.359+05:30\",\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.360+05:30\"\n  }\n}"
+            },
+            {
+              "name": "422 - already completed",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/44/cancel",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "44",
+                    "cancel"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "description": "Cancels a scheduled, queued or in-progress bulk action. Returns 422 if it already finished."
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Bulk action is already completed\"\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -173,8 +1207,72 @@
           "name": "List entities & actions",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/entities", "host": ["{{baseUrl}}"], "path": ["entities"] }
-          }
+            "url": {
+              "raw": "{{baseUrl}}/entities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entities"
+              ]
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has data object', () => pm.expect(pm.response.json().data).to.be.an('object'));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/entities",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "entities"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"entities\": [\n      {\n        \"name\": \"contact\",\n        \"label\": \"Contacts\",\n        \"fields\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"email\": {\n            \"type\": \"string\"\n          },\n          \"age\": {\n            \"type\": \"integer\"\n          },\n          \"status\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"lead\",\n              \"prospect\",\n              \"customer\",\n              \"churned\"\n            ]\n          }\n        },\n        \"updatable_fields\": [\n          \"name\",\n          \"email\",\n          \"age\",\n          \"status\"\n        ],\n        \"filterable_fields\": [\n          \"status\",\n          \"age\",\n          \"email\"\n        ],\n        \"dedupe_field\": \"email\"\n      },\n      {\n        \"name\": \"company\",\n        \"label\": \"Companies\",\n        \"fields\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"domain\": {\n            \"type\": \"string\"\n          },\n          \"industry\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"technology\",\n              \"logistics\",\n              \"manufacturing\",\n              \"retail\",\n              \"finance\",\n              \"healthcare\"\n            ]\n          },\n          \"employee_count\": {\n            \"type\": \"integer\"\n          },\n          \"status\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"prospect\",\n              \"active\",\n              \"inactive\"\n            ]\n          }\n        },\n        \"updatable_fields\": [\n          \"name\",\n          \"domain\",\n          \"industry\",\n          \"employee_count\",\n          \"status\"\n        ],\n        \"filterable_fields\": [\n          \"status\",\n          \"industry\",\n          \"domain\"\n        ],\n        \"dedupe_field\": \"domain\"\n      },\n      {\n        \"name\": \"lead\",\n        \"label\": \"Leads\",\n        \"fields\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"email\": {\n            \"type\": \"string\"\n          },\n          \"company_name\": {\n            \"type\": \"string\"\n          },\n          \"source\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"website\",\n              \"referral\",\n              \"event\",\n              \"cold_call\",\n              \"campaign\"\n            ]\n          },\n          \"score\": {\n            \"type\": \"integer\"\n          },\n          \"status\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"new\",\n              \"contacted\",\n              \"qualified\",\n              \"disqualified\"\n            ]\n          }\n        },\n        \"updatable_fields\": [\n          \"name\",\n          \"email\",\n          \"company_name\",\n          \"source\",\n          \"score\",\n          \"status\"\n        ],\n        \"filterable_fields\": [\n          \"status\",\n          \"source\",\n          \"email\"\n        ],\n        \"dedupe_field\": \"email\"\n      },\n      {\n        \"name\": \"opportunity\",\n        \"label\": \"Opportunities\",\n        \"fields\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"amount\": {\n            \"type\": \"decimal\"\n          },\n          \"stage\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"prospecting\",\n              \"qualification\",\n              \"proposal\",\n              \"negotiation\",\n              \"closed_won\",\n              \"closed_lost\"\n            ]\n          },\n          \"probability\": {\n            \"type\": \"integer\"\n          },\n          \"close_date\": {\n            \"type\": \"date\"\n          }\n        },\n        \"updatable_fields\": [\n          \"name\",\n          \"amount\",\n          \"stage\",\n          \"probability\",\n          \"close_date\"\n        ],\n        \"filterable_fields\": [\n          \"stage\",\n          \"company_id\"\n        ],\n        \"dedupe_field\": null\n      },\n      {\n        \"name\": \"task\",\n        \"label\": \"Tasks\",\n        \"fields\": {\n          \"title\": {\n            \"type\": \"string\"\n          },\n          \"description\": {\n            \"type\": \"text\"\n          },\n          \"status\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"todo\",\n              \"in_progress\",\n              \"done\"\n            ]\n          },\n          \"priority\": {\n            \"type\": \"select\",\n            \"options\": [\n              \"low\",\n              \"medium\",\n              \"high\"\n            ]\n          },\n          \"due_date\": {\n            \"type\": \"date\"\n          },\n          \"assignee\": {\n            \"type\": \"string\"\n          }\n        },\n        \"updatable_fields\": [\n          \"title\",\n          \"description\",\n          \"status\",\n          \"priority\",\n          \"due_date\",\n          \"assignee\"\n        ],\n        \"filterable_fields\": [\n          \"status\",\n          \"priority\",\n          \"assignee\"\n        ],\n        \"dedupe_field\": null\n      }\n    ],\n    \"actions\": [\n      \"bulk_update\"\n    ]\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List entity records",
@@ -182,16 +1280,141 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/entities/contact/records?page=1&per_page=25",
-              "host": ["{{baseUrl}}"],
-              "path": ["entities", "contact", "records"],
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entities",
+                "contact",
+                "records"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "per_page", "value": "25" },
-                { "key": "status", "value": "lead", "disabled": true, "description": "Any filterable field of the entity" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "25"
+                },
+                {
+                  "key": "status",
+                  "value": "lead",
+                  "disabled": true,
+                  "description": "Any filterable field of the entity"
+                }
               ]
             },
-            "description": "entity_type: contact, company, lead, opportunity, task"
-          }
+            "description": "entity_type: contact, company, lead, opportunity, task",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has data array and pagination meta', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j.meta).to.include.keys('page', 'per_page', 'total_count', 'total_pages');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/entities/contact/records?page=1&per_page=3",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "entities",
+                    "contact",
+                    "records"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "3"
+                    }
+                  ]
+                },
+                "description": "entity_type: contact, company, lead, opportunity, task",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": 1,\n      \"name\": \"NAME3\",\n      \"email\": \"contact0@example.com\",\n      \"age\": 35,\n      \"status\": \"prospect\",\n      \"updated_at\": \"2026-10-06T17:48:36.046+05:30\"\n    },\n    {\n      \"id\": 2,\n      \"name\": \"NAME3\",\n      \"email\": \"contact1@example.com\",\n      \"age\": 48,\n      \"status\": \"prospect\",\n      \"updated_at\": \"2026-10-06T16:47:33.226+05:30\"\n    },\n    {\n      \"id\": 3,\n      \"name\": \"NAME3\",\n      \"email\": \"contact2@example.com\",\n      \"age\": 48,\n      \"status\": \"prospect\",\n      \"updated_at\": \"2026-10-06T16:47:33.226+05:30\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"per_page\": 3,\n    \"total_count\": 20000,\n    \"total_pages\": 6667\n  }\n}"
+            },
+            {
+              "name": "422 - unknown entity",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/entities/unknown/records",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "entities",
+                    "unknown",
+                    "records"
+                  ]
+                },
+                "description": "entity_type: contact, company, lead, opportunity, task",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Unknown entity_type 'unknown'. Allowed: contact, company, lead, opportunity, task\"\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -202,49 +1425,663 @@
           "name": "Companies - activate prospects (dedupe by domain)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"company\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"prospect\" } },\n  \"payload\": { \"fields\": { \"status\": \"active\", \"industry\": \"logistics\" } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"company\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": \"prospect\" } },\n  \"payload\": { \"fields\": { \"status\": \"active\", \"industry\": \"logistics\" } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"company\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"active\",\n        \"industry\": \"logistics\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"status\": \"prospect\"\n      }\n    },\n    \"dedupe\": true,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Leads - qualify new & contacted (dedupe by email)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"lead\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": [\"new\", \"contacted\"] } },\n  \"payload\": { \"fields\": { \"status\": \"qualified\", \"score\": 80 } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"lead\",\n  \"action_type\": \"bulk_update\",\n  \"dedupe\": true,\n  \"filters\": { \"where\": { \"status\": [\"new\", \"contacted\"] } },\n  \"payload\": { \"fields\": { \"status\": \"qualified\", \"score\": 80 } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"lead\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"qualified\",\n        \"score\": 80\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"status\": [\n          \"new\",\n          \"contacted\"\n        ]\n      }\n    },\n    \"dedupe\": true,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Opportunities - close negotiation deals",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"opportunity\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"stage\": \"negotiation\" } },\n  \"payload\": { \"fields\": { \"stage\": \"closed_won\", \"probability\": 100, \"close_date\": \"2026-10-31\" } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"opportunity\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"stage\": \"negotiation\" } },\n  \"payload\": { \"fields\": { \"stage\": \"closed_won\", \"probability\": 100, \"close_date\": \"2026-10-31\" } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"opportunity\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"stage\": \"closed_won\",\n        \"probability\": 100,\n        \"close_date\": \"2026-10-31\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"stage\": \"negotiation\"\n      }\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Tasks - complete high priority and reassign",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/bulk-actions", "host": ["{{baseUrl}}"], "path": ["bulk-actions"] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"task\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"priority\": \"high\" } },\n  \"payload\": { \"fields\": { \"status\": \"done\", \"assignee\": \"brij\" } }\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "const id = pm.response.json().data && pm.response.json().data.id;",
+                  "if (id) pm.collectionVariables.set('bulkActionId', id);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"account_id\": \"acc_1\",\n  \"entity_type\": \"task\",\n  \"action_type\": \"bulk_update\",\n  \"filters\": { \"where\": { \"priority\": \"high\" } },\n  \"payload\": { \"fields\": { \"status\": \"done\", \"assignee\": \"brij\" } }\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"data\": {\n    \"id\": 48,\n    \"account_id\": \"acc_1\",\n    \"entity_type\": \"task\",\n    \"action_type\": \"bulk_update\",\n    \"status\": \"queued\",\n    \"sequence\": null,\n    \"payload\": {\n      \"fields\": {\n        \"status\": \"done\",\n        \"assignee\": \"brij\"\n      }\n    },\n    \"filters\": {\n      \"where\": {\n        \"priority\": \"high\"\n      }\n    },\n    \"dedupe\": false,\n    \"stats\": {\n      \"total\": 0,\n      \"processed\": 0,\n      \"success\": 0,\n      \"failed\": 0,\n      \"skipped\": 0,\n      \"pending\": 0,\n      \"progress_percent\": 0\n    },\n    \"scheduled_at\": null,\n    \"started_at\": null,\n    \"completed_at\": null,\n    \"error_message\": null,\n    \"created_at\": \"2026-10-06T18:23:28.308+05:30\",\n    \"updated_at\": \"2026-10-06T18:23:28.308+05:30\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error handling",
+      "description": "Every error, including unknown routes and malformed JSON, returns JSON `{ \"errors\": [...] }`.",
+      "item": [
+        {
+          "name": "Bulk action not found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has errors array', () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "999999"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/999999",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "999999"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Couldn't find BulkAction with 'id'=999999\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Malformed JSON body (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has errors array', () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"account_id\": \"acc_1\", "
+            }
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"account_id\": \"acc_1\", "
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"Malformed JSON body: Error occurred while parsing request parameters\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Unknown route (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has errors array', () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/does-not-exist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "does-not-exist"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/does-not-exist",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "does-not-exist"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"No route matches GET /does-not-exist\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Unsupported method (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Response is JSON', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+                  "  pm.response.to.be.json;",
+                  "});",
+                  "pm.test('Has errors array', () => pm.expect(pm.response.json().errors).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bulk-actions/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "bulk-actions",
+                "1"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bulk-actions/1",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "bulk-actions",
+                    "1"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"errors\": [\n    \"No route matches DELETE /bulk-actions/1\"\n  ]\n}"
+            }
+          ]
         }
       ]
     }

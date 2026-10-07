@@ -1,9 +1,10 @@
 module BulkActions
   # Last-writer-wins per field across bulk actions, independent of execution order.
   #
-  # Inside one transaction it locks the batch's rows (SELECT ... FOR UPDATE, ordered by id so concurrent
-  # batches lock in the same order), reads which action last wrote each field, lets the handler apply only
-  # the fields this action is entitled to, then records this action as the latest writer of those fields.
+  # Reads which action last wrote each field of the batch's records, lets the handler apply only the fields
+  # this action is entitled to, then records this action as the latest writer of those fields.
+  # Must run inside the batch transaction with the records already locked (BatchJob does both), so the
+  # check, the write and the version update are atomic with respect to other batches.
   class FieldVersionGuard
     def initialize(bulk_action, entity)
       @bulk_action = bulk_action
@@ -11,22 +12,12 @@ module BulkActions
       @mine = bulk_action.version_key
     end
 
-    # Yields the locked, freshly loaded records. Retries the whole unit on deadlock.
-    def synchronize(ids, fields, attempts: 3)
-      ActiveRecord::Base.transaction do
-        records = @entity.model.where(id: ids).order(:id).lock.to_a
-        load_versions(records.map(&:id), fields)
-        @touched = []
-        result = yield records
-        write_versions
-        result
-      end
-    rescue ActiveRecord::Deadlocked
-      attempts -= 1
-      raise if attempts.zero?
-
-      sleep(rand * 0.2)
-      retry
+    def track(records, fields)
+      load_versions(records.map(&:id), fields)
+      @touched = []
+      result = yield
+      write_versions
+      result
     end
 
     # Returns [fields this action may write, ids of newer actions that own the other fields].

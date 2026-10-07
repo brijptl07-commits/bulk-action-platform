@@ -36,15 +36,18 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
    │ BatchJob × N  (any number of processes)  │
    │  - skip ids already logged (idempotent)  │
    │  - RateLimiter.acquire(account, n)       │── over limit → re-enqueue for next window
-   │  - handler = ActionRegistry[action_type] │
-   │  - handler.call(records) → results       │  1 bulk UPDATE per batch
-   │  - txn: counters += ..., insert logs     │
+   │  - ONE transaction:                      │
+   │      lock rows, handler.call(records),   │  1 bulk UPDATE per batch
+   │      field versions, counters, logs      │
    │  - mark completed when processed = total │
    └──────────────────┬───────────────────────┘
                       ▼
                  ┌──────────────┐
                  │    MySQL     │  CRM entity tables, bulk_actions, bulk_action_logs
                  └──────────────┘
+
+   RecoveryJob (every 5 min, one at a time): re-plans lost/dead plans, re-sends lost batches,
+   completes finished actions — so nothing stays stuck (see "Reliability and recovery").
 ```
 
 ### Key design decisions
@@ -53,9 +56,9 @@ A scalable, extensible platform for running bulk actions (starting with **Bulk U
 |---|---|
 | **Large volumes** | Planner never loads the full set: keyset pagination on the primary key, only `id` (+ dedupe field) is plucked. Ids are snapshotted at plan time, so updating the field you filtered on doesn't shift the target set. |
 | **Efficient writes** | Each batch validates records in memory (so per-record errors are logged) and then writes all valid rows with a **single** `UPDATE ... WHERE id IN (...)`. Logs are written with one multi-row `INSERT`. |
-| **Horizontal scaling** | All state lives in MySQL/Redis. Run more `sidekiq` processes (on any machine) to process more batches in parallel. |
+| **Horizontal scaling** | Workers are stateless; all state lives in MySQL/Redis. Run more `sidekiq` processes (on any machine) to process more batches in parallel. Measured with `bin/scale_test`: 1 → 2 → 4 processes gives 1.0x → 1.6x → 1.9x throughput on one laptop (see [Load test](#load-test)). |
 | **Progress / stats** | Counters (`total`, `processed`, `success`, `failed`, `skipped`) are maintained atomically with `UPDATE ... SET x = x + n` — stats are O(1), no `COUNT(*)` over logs. |
-| **Reliability** | Batch jobs retry (Sidekiq, 5 attempts). They are idempotent: already-logged ids are skipped, and a unique index on `(bulk_action_id, entity_id)` prevents double logging. Counter update + log insert happen in one transaction (counter row locked first to avoid MySQL FK deadlocks). Status changes use conditional updates (`WHERE status IN (...)`) so concurrent workers can't race. |
+| **Reliability** | Each batch is **one transaction** (record update + field versions + counters + logs), so a crash never leaves records updated without logs or counts. Batches retry (Sidekiq, 5 attempts) and are idempotent: already-logged ids are skipped (re-checked under the row locks), and a unique index on `(bulk_action_id, entity_id)` prevents double logging. The planner is restartable, and a `RecoveryJob` finds and fixes anything stuck. Status changes use conditional updates (`WHERE status IN (...)`) so concurrent workers can't race. Details: [Reliability and recovery](#reliability-and-recovery). |
 | **Extensibility** | Two registries: `EntityRegistry` (which models + which fields are updatable/filterable/dedupe) and `ActionRegistry` (`action_type` → handler class). Planning, batching, retries, rate limiting, dedupe, logs and stats are shared by every action. |
 | **Concurrent actions on the same records** | Each action gets a strictly increasing `sequence` when it starts (durable MySQL counter). Every write stamps `last_bulk_action_seq` on the record, and the batch `UPDATE` only touches rows whose stamp is not newer. So if action 2 started after action 1, action 1 can never overwrite action 2's values, even if its batch runs later; those records are logged as `skipped — Superseded by newer bulk action #2`. Actions still run fully in parallel. |
 | **Concurrent actions on the same records** | Last-writer-wins **per field**, independent of execution order (see below). |
@@ -98,6 +101,7 @@ Platform tables:
 
 - `bulk_actions` — `account_id, entity_type, action_type, status, payload (json), filters (json), dedupe, total/processed/success/failure/skipped counts, scheduled_at, started_at, planned_at, completed_at, error_message`
 - `bulk_action_logs` — `bulk_action_id, entity_id, status (success|failed|skipped), message` — indexed by `(bulk_action_id, status)` and unique `(bulk_action_id, entity_id)`
+- `bulk_field_versions` — `entity_type, entity_id, field, bulk_action_id, effective_at` — primary key `(entity_type, entity_id, field)`; latest bulk writer per field
 
 Statuses: `scheduled → queued → in_progress → completed | failed | cancelled`
 
@@ -109,16 +113,22 @@ app/services/bulk_actions/
   action_registry.rb      # register actions (action_type → handler)
   handlers/base.rb        # handler contract
   handlers/bulk_update.rb # the Bulk Update action
+  field_version_guard.rb  # per-field last-writer-wins across bulk actions
   creator.rb              # validate request, persist, enqueue (now or scheduled)
   scope_builder.rb        # filters → ActiveRecord relation
+  planner.rb              # keyset page walker over an action's target records (+ dedupe)
   rate_limiter.rb         # per-account fixed-window limiter (Redis + Lua, atomic)
   deduplicator.rb         # Redis-set based de-duplication
+  recovery.rb             # finds stuck actions and puts them back on track
+  redis_lease.rb          # self-expiring Redis lock with heartbeat
 app/sidekiq/bulk_actions/
-  plan_job.rb             # step 1: plan & fan out batches
-  batch_job.rb            # step 2: process a batch
+  plan_job.rb             # step 1: plan & fan out batches (restartable)
+  batch_job.rb            # step 2: process a batch in one transaction
+  recovery_job.rb         # runs Recovery every RECOVERY_INTERVAL_SECONDS
 config/initializers/bulk_actions.rb   # registrations
 app/controllers/api/*     # JSON API
 app/controllers/ui/*      # basic UI
+test/                     # Minitest: handler, creator, rate limiter, jobs, recovery, API
 ```
 
 ---
@@ -162,15 +172,41 @@ Nothing else changes — the API, UI, planner, batching, rate limiting, dedupe, 
 
 ## Setup
 
+### Option A: Docker (one command)
+
+Requirements: Docker with Compose v2. Nothing else (no Ruby, MySQL or Redis on the host).
+
+```bash
+docker compose up --build
+```
+
+This starts MySQL 8, Redis 7, a one-shot `setup` service (creates + migrates the database and seeds
+**100,000 contacts** and 5,000 records of every other entity, topping up only what is missing), the Rails
+server and a Sidekiq worker. Change the counts with `SEED_COUNT` / `SEED_CONTACT_COUNT` in `docker-compose.yml`.
+
+- UI: http://localhost:3000 (use `WEB_PORT=3001 docker compose up` if port 3000 is taken)
+- Sidekiq dashboard: http://localhost:3000/sidekiq
+- API: http://localhost:3000/bulk-actions (the Postman collection works unchanged)
+
+```bash
+docker compose up -d --scale worker=4             # horizontal scaling: 4 Sidekiq processes
+docker compose logs -f web worker                 # follow logs
+docker compose exec web bin/rails "crm:seed[50000,contact]"   # more data
+docker compose exec web bin/rails bulk:load_test  # throughput test inside Docker
+docker compose down                               # stop (add -v to also delete the database)
+```
+
+### Option B: Local
+
 Requirements: Ruby 3.1.3, MySQL 8, **Redis 6+** (Sidekiq 7 requirement).
 
 ```bash
 bundle install
 cp .env.example .env            # set DB_PASSWORD etc.
-docker compose up -d redis      # Redis 7 on localhost:6380 (skip if you have Redis 6+)
+docker run -d --name bulk_action_redis -p 6380:6379 redis:7-alpine   # Redis 7 on localhost:6380 (skip if you have Redis 6+)
 
 bin/rails db:create db:migrate
-bin/rails db:seed                          # 2,000 records per entity (~5% duplicate emails/domains)
+bin/rails db:seed                          # tops up to 2,000 per entity (SEED_COUNT, SEED_CONTACT_COUNT=100000 ...)
 bin/rails "crm:seed[20000,contact]"        # optional: more records for one entity
 bin/rails "crm:seed[5000]"                 # optional: more records for every entity
 bin/rails "contacts:import[db/sample_contacts.csv]"   # optional: import contacts from CSV
@@ -189,10 +225,25 @@ bundle exec sidekiq -C config/sidekiq.yml
 | Variable | Default | Purpose |
 |---|---|---|
 | `BULK_BATCH_SIZE` | 500 | records per batch job |
-| `RATE_LIMIT_PER_MINUTE` | 10000 | max records processed per account per minute |
+| `RATE_LIMIT_PER_MINUTE` | 30000 | max records processed per account per minute |
 | `SIDEKIQ_CONCURRENCY` | 10 | threads per Sidekiq process |
 | `REDIS_URL` | redis://localhost:6380/0 | Redis |
 | `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_POOL` | | MySQL |
+| `RECOVERY_INTERVAL_SECONDS` | 300 | how often `RecoveryJob` runs |
+| `RECOVERY_STALL_SECONDS` | 600 | an in-progress action with no committed batch for this long gets its unprocessed records re-sent |
+
+### Tests
+
+```bash
+bin/rails db:test:prepare && bin/rails test                                                  # local
+docker compose run --rm -e RAILS_ENV=test web bash -c "bin/rails db:test:prepare && bin/rails test"   # Docker
+```
+
+Minitest, against real MySQL and Redis (Redis DB 15, so dev data is untouched). Covers the Bulk Update handler
+(validation, per-record failures, last-writer-wins in both orders), `Creator`, the rate limiter, `PlanJob`
+(batching, dedupe, resume, lease), `BatchJob` (logs/counters, skipped records, idempotency, concurrent duplicate
+deliveries, full rollback on failure, deadlock retry, rate-limit reschedule), `Recovery`/`RecoveryJob`, and the API
+end to end.
 
 ---
 
@@ -263,8 +314,12 @@ Cancels a scheduled/queued/in-progress action; remaining batches become no-ops.
 
 **Rate limiting** — every bulk action has an `account_id`. Before a batch is processed, `RateLimiter.acquire`
 atomically (Lua script) reserves `n` units in a Redis counter keyed by `account + current minute`. If the account
-would exceed `RATE_LIMIT_PER_MINUTE` (default 10k), the batch is re-scheduled to the start of the next window instead
+would exceed `RATE_LIMIT_PER_MINUTE` (default 30k), the batch is re-scheduled to the start of the next window instead
 of being dropped. The limit is shared across all workers/processes.
+
+The planner enqueues every batch up front. With 1,000,000 records at 30,000/min, 2,000 batches are queued: about 60
+run in the current minute and the rest are re-scheduled to the next one, again and again until their turn. That
+repeated pick-up and re-schedule is wasted work (see the production notes for the fix).
 
 **De-duplication** — when `dedupe: true`, the planner walks records in id order and `SADD`s each normalized value of
 the entity's dedupe key (email for contacts and leads, domain for companies) into a per-action Redis set. If the
@@ -313,19 +368,86 @@ as superseded).
 
 New entities get this protection by adding the two columns; without them the handler falls back to plain updates.
 
+## Reliability and recovery
+
+**One transaction per batch.** `BatchJob` locks the batch's records (`SELECT ... FOR UPDATE`, in id order), runs
+the handler, records field versions, bumps the counters and inserts the logs — all in one transaction. If the
+worker crashes or any step fails, MySQL rolls everything back, so there is never a record that was updated but not
+logged or counted. The retry starts from a clean state. Ids that already have a log row are skipped, checked again
+after the row locks are taken, so two deliveries of the same batch running at the same time count each record once.
+
+**Restartable planner.** `PlanJob` holds a Redis lease (`bulk_actions:planning:<id>`, 60s, refreshed on every page),
+so only one planner works on an action. If it dies part-way, a retry or `RecoveryJob` runs it again from the start:
+batches skip logged records, the dedupe set is rebuilt and `total_count` is overwritten, so nothing is processed or
+counted twice. After 3 failed attempts the action is marked `failed`.
+
+**RecoveryJob** runs every `RECOVERY_INTERVAL_SECONDS` (5 min) — exactly one run at a time across all Sidekiq
+processes (a Redis tick lock; it reschedules itself and is re-armed at Sidekiq boot and on every new action).
+`bin/rails bulk:recover` runs the same check once by hand.
+
+| Stuck state | How it is detected | Fix |
+|---|---|---|
+| `scheduled`/`queued`, but its `PlanJob` was lost | `scheduled_at` passed 2 min ago / queued for 10 min | enqueue `PlanJob` again |
+| Planner died before finishing | `in_progress`, `planned_at` empty, no planner lease | enqueue `PlanJob` (it resumes) |
+| Some batches were lost (Redis data loss, retries exhausted) | planned, records pending, no batch committed for `RECOVERY_STALL_SECONDS` | re-walk the scope (records created before `planned_at`), send only records with no log row |
+| All records processed but not marked completed | `processed_count >= total_count` | mark `completed` |
+
+Every fix goes through an idempotent path, so running recovery too often or at the same time as normal processing
+is harmless.
+
+Verified by killing Sidekiq with `kill -9` in the middle of a 100,000-contact update (and deleting its queued
+batches to simulate Redis data loss): after restart, recovery resumed the planner and the action completed with
+exactly 100,000 processed / 100,000 logs.
+
+---
+
 ## Load test
 
 ```bash
-bin/rails "crm:seed[18000,contact]"   # 20,000 contacts in total
-bin/rails "bulk:load_test"
+bin/rails "crm:seed[80000,contact]"        # dummy contacts (100,000 in total here)
+bin/rails bulk:load_test                   # one bulk update over all contacts, with Sidekiq running
+RECORDS=25000 bin/rails bulk:load_test     # only the first 25,000 contacts
+bin/scale_test 1 2 4                       # same test with 1, 2 and 4 Sidekiq processes
 ```
 
-Results on a laptop (MySQL 8, 20,000 contacts, batch size 500):
+`bulk:load_test` creates a real bulk action (status + age on every contact) through the normal pipeline
+(`Creator` → `PlanJob` → `BatchJob`s → logs + counters) and reports the worker count and records/minute.
+`bin/scale_test` starts N Sidekiq processes, runs the test, stops them and prints a comparison. It raises the
+per-account rate limit for its own workers so the numbers show raw capacity; stop any other Sidekiq first.
 
-| Setup | Result |
+### Results (one laptop: 8 cores, MySQL 8 with the default 128 MB buffer pool, batch size 500)
+
+**Horizontal scaling — 100,000 contacts per run, rate limit raised:**
+
+| Sidekiq processes | Threads | Time | Records / minute | Speed-up |
+|---|---|---|---|---|
+| 1 | 10 | 59.4s | 101,072 | 1.0x |
+| 2 | 20 | 37.0s | 162,082 | 1.6x |
+| 4 | 40 | 31.6s | 189,806 | 1.9x |
+
+Every run: 100,000 success, 0 failed, 0 deadlocks, exactly 100,000 log rows, counters equal to logs.
+The gain flattens at 4 processes because the workers, MySQL and Redis share one laptop; with MySQL on its own
+host (and a larger buffer pool) more workers keep adding throughput.
+
+**Rate limit — 25,000 contacts, 2 processes, limit set to 10,000/min per account:**
+
+| Minute | Records processed |
 |---|---|
-| 2 Sidekiq processes × 10 threads, rate limit raised | 20,000 records in 5.6s ≈ **213,000 records/min** |
-| default rate limit 10,000/min per account | progress pauses at the limit and resumes in the next minute window |
+| 23:30 | 10,000 |
+| 23:31 | 10,000 |
+| 23:32 | 5,000 |
+
+The limit holds across processes because the counter lives in Redis; extra batches wait for the next window.
+
+### Bottlenecks found by the load test (and fixed)
+
+1. **Planner stalled behind batches.** `PlanJob` used to add to `total_count` after every page, on the same
+   `bulk_actions` row every batch locks for its counters, so planning 100k records took 37s and extra workers
+   sat idle. It now writes an estimate (`COUNT`) up front and the exact total once at the end.
+2. **Deadlocks on `bulk_field_versions`.** With an auto-increment `id`, every new row was inserted at the end of
+   the primary key and concurrent upserts deadlocked on its gap locks (throughput *dropped* as workers were
+   added). The natural key `(entity_type, entity_id, field)` is now the primary key, so batches of different
+   records write to different parts of the index.
 
 ---
 
@@ -333,11 +455,18 @@ Results on a laptop (MySQL 8, 20,000 contacts, batch size 500):
 
 - **Hot counter row**: with very high parallelism the `bulk_actions` counter row becomes a contention point. Next
   step: accumulate counters in Redis (`HINCRBY`) and flush to MySQL periodically.
+- **Field versions vs. single-record edits**: the guard orders bulk actions against each other. Regular
+  single-record edits from the app could also bump `bulk_field_versions` (or a `lock_version`) so a late bulk
+  action never overwrites a newer manual edit.
 - **Logs volume**: for millions of records per action, partition `bulk_action_logs` by date / action or move logs
   to a columnar or log store, with a retention policy.
 - **Rate limiting**: fixed window allows bursts at window edges; a sliding window or GCRA would be smoother.
   Separate queues per account (or weighted fetch) would add fairness between tenants.
-- **Planner restart**: the planner is single-shot; for very large actions it could checkpoint `last_id` so it can
-  resume after a crash.
+- **Rate-limit aware planning**: the planner enqueues all batches at once, so with a low limit most of them are
+  picked up, rejected and re-scheduled every minute. The planner should enqueue only what fits in the current
+  minute, save its position (`last_id`) and continue the next minute. That also gives a planner checkpoint for
+  crash recovery and keeps Redis small for very large actions.
+- **Scheduling**: `RecoveryJob` reschedules itself to avoid a cron dependency; in production a periodic-job
+  feature (sidekiq-cron / Sidekiq Enterprise) is the simpler choice.
 - **Real-time UI**: the UI polls every 2s; ActionCable / Turbo Streams could push progress instead.
-- Authentication / multi-tenancy (deriving `account_id` from the caller), and automated tests (RSpec).
+- Authentication / multi-tenancy (deriving `account_id` from the caller).

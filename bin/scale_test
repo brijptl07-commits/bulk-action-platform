@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Horizontal scaling test: runs the same bulk:load_test with 1, 2, 4 ... Sidekiq processes and
+# prints throughput for each. The per-account rate limit is raised for these workers only, so the
+# numbers show raw capacity rather than the 10k/min cap.
+#
+# Usage: bin/scale_test [process counts...]      e.g. bin/scale_test 1 2 4
+# Stop any other Sidekiq process for this app first, so every batch runs on the measured workers.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+counts=("$@")
+[ ${#counts[@]} -eq 0 ] && counts=(1 2 4)
+
+if pgrep -f "sidekiq .*bulk_action_platform" > /dev/null; then
+  echo "Another Sidekiq process is running for this app. Stop it first (Ctrl-C in its terminal)." >&2
+  exit 1
+fi
+
+export RATE_LIMIT_PER_MINUTE="${RATE_LIMIT_PER_MINUTE:-10000000}"
+mkdir -p log
+pids=()
+results=()
+
+stop_workers() {
+  [ ${#pids[@]} -eq 0 ] && return
+  kill -TERM "${pids[@]}" 2> /dev/null || true
+  wait "${pids[@]}" 2> /dev/null || true
+  pids=()
+}
+trap stop_workers EXIT
+
+for n in "${counts[@]}"; do
+  echo "=== ${n} Sidekiq process(es) ==="
+  for i in $(seq 1 "$n"); do
+    bundle exec sidekiq -C config/sidekiq.yml > "log/scale_test_sidekiq_${i}.log" 2>&1 &
+    pids+=($!)
+  done
+
+  output=$(EXPECT_PROCESSES="$n" bin/rails bulk:load_test 2>&1 | grep -v WARN | tee /dev/stderr)
+  results+=("$(grep '^RESULT' <<< "$output")")
+  stop_workers
+done
+
+echo
+echo "Processes | Threads | Records | Seconds | Records/minute | Speed-up"
+base=""
+for line in "${results[@]}"; do
+  eval "$(sed 's/^RESULT //' <<< "$line")"
+  base=${base:-$per_minute}
+  printf "%9s | %7s | %7s | %7s | %14s | %.1fx\n" \
+    "$processes" "$threads" "$records" "$seconds" "$per_minute" "$(echo "$per_minute / $base" | bc -l)"
+done

@@ -25,4 +25,8 @@ Rails.application.routes.draw do
   mount Sidekiq::Web => "/sidekiq"
 
   root "ui/bulk_actions#index"
+
+  # Any unmatched path/verb outside the UI gets a JSON 404 instead of Rails' HTML error page.
+  match "*unmatched", to: "api/base#route_not_found", via: :all, defaults: { format: :json },
+                      constraints: ->(req) { !req.path.start_with?("/ui", "/sidekiq", "/assets", "/rails") }
 end
